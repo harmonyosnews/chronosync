@@ -1,11 +1,14 @@
 # ChronoSync v1.0.2 发布报告
 
-- 状态：**技术冻结完成，等待 GitHub Release 上传**
+- 状态：**已发布**
 - 目标仓库：`https://github.com/harmonyosnews/chronosync`
 - 发布版本：**1.0.2**
 - 发布 tag：`v1.0.2`
+- 冻结 commit：`a3a37b97999851683d74796f7a3b27d5017d4d4d`
+- Release ID：`435153841`
 - 构建时间：`20261105-200000`
 - 发布方式：源码提交 + GitHub Release 二进制资产
+- 发布页：`https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2`
 - WebUI：编译时嵌入主程序，运行时为单文件可执行程序
 
 ## 1. 范围
@@ -53,7 +56,7 @@ Wave 4 的具体问题和修复：
 | G10 敏感信息扫描 | PASS | 精确 token=0、真实密码值=0、真实内网 IP=0、敏感主机名=0 |
 | G11 版本一致性 | PASS | 源码/UI/安装器/README/CHANGELOG/包名/构建信息均为 1.0.2；旧发布号残留=0 |
 | G12 自动端口回退 | PASS | Linux 权限错误回退 + Windows 445→446 实测 |
-| G13 GitHub 发布与回读 | PENDING | 提交、tag、Release 上传后执行并回读校验 |
+| G13 GitHub 发布与回读 | PASS | `main`/`v1.0.2` 指向提交 `a3a37b9`；Release 435153841 的 8 个初传资产大小与 SHA256 digest 全部匹配 |
 
 完整命令输出和细节见 `reports/gates-1.0.2.log`、`reports/BUILD-1.0.2.md` 和 `reports/REAL-DEVICE-TESTS-1.0.2.md`。
 
@@ -119,4 +122,13 @@ sudo ./install.sh --auth admin:'换成强密码'
 
 ## 9. 发布后回填
 
-冻结 commit、tag 推送结果、Release ID 和资产回读状态在上传完成后补充到本节；技术产物与哈希以本报告和 Release 资产为准。
+- 仓库：`harmonyosnews/chronosync`，公开仓库，默认分支 `main`
+- 冻结 commit：`a3a37b97999851683d74796f7a3b27d5017d4d4d`
+- tag：`v1.0.2`，annotated tag 对象 `d8967c53d04a9d490bc12d123dde5a761a04eba7`，指向冻结 commit
+- Release：ID `435153841`，`https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2`
+- 初传资产 8 个：6 个平台包、source 包、`SHA256SUMS`；GitHub 回读的大小和 `sha256:` digest 与本地一致
+- 发布报告、构建报告和真机测试报告随后作为 Release 文本资产上传
+- 发布后的文档回填提交只修改 `reports/`，不改变已发布的二进制、源码包或标签
+- 技术产物与 SHA256 以冻结 commit、Release 资产和 `SHA256SUMS` 为准
+
+发布完成。最终校验未发现 token、真实 SSH 密码、真实内网 IP 清单或敏感目标主机名。

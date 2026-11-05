@@ -93,4 +93,12 @@ PASS
 - final binaries rebuilt after the fix
 
 == G13 GitHub release and read-back ==
-PENDING (to be completed after commit/tag push and asset upload)
+PASS
+- repository: harmonyosnews/chronosync (public), default branch main
+- release commit: a3a37b97999851683d74796f7a3b27d5017d4d4d
+- annotated tag: v1.0.2 -> d8967c53d04a9d490bc12d123dde5a761a04eba7 -> a3a37b9
+- release ID: 435153841
+- release URL: https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2
+- initial assets: 8 (6 platform packages, source, SHA256SUMS)
+- remote asset sizes and sha256 digests: all match local files
+- release report / build report / real-device report uploaded after this log update
