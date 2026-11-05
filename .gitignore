@@ -1,0 +1,9 @@
+/target
+/dist
+/logs
+/gui-test-screenshots
+*.log
+!reports/*.log
+.DS_Store
+/winlogs*
+/.dsh-secrets

@@ -1,0 +1,27 @@
+ChronoSync v1.0.2 - Windows x86_64
+=================================
+
+直接双击 start-chronosync.bat。
+启动器会带上 --open --auto-port：
+- 8686 被其他程序占用时自动尝试 8687-8696；
+- 打印实际访问地址并尝试自动打开 WebUI；
+- 如果已有 ChronoSync 在运行，会直接打开已有 WebUI。
+
+功能：
+- “清除设备”按钮：移除全部设备行和浏览器已保存的 SSH 密码；运行日志保留。
+- “记住 SSH 密码”开关（默认关闭）：勾选后密码以明文保存在当前浏览器
+  localStorage，刷新/重启浏览器后可恢复。地址和用户名本来就会保存。
+  请在个人受信任电脑上使用；清除设备会同时删除已保存密码。
+
+8686 排查：
+  netstat -ano | findstr :8686
+如果只有 CLOSE_WAIT/ESTABLISHED、没有 LISTENING，说明是其他程序的连接
+占用；确认 PID 对应程序后可 taskkill /F /PID <PID>，或直接使用自动端口。
+Windows 没有 kill/pkill 命令。
+
+其他：
+- 防火墙需允许 chronosync.exe 或实际 TCP 端口，局域网才能访问。
+- “本机校时”需右键以管理员身份运行；远程校时不需要管理员。
+- Windows 上 RTC 独立写入和时区切换会跳过。
+- WebUI 已嵌入 exe，不需要 web 目录。
+- 发布页：https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2

@@ -1,0 +1,96 @@
+ChronoSync v1.0.2 gates
+2026-11-05 20:05 CST
+Build: 20261105-200000
+Version: 1.0.2
+
+== G1 fmt ==
+PASS (cargo fmt --check, no diff)
+
+== G2 clippy ==
+PASS (cargo clippy --all-targets -- -D warnings; 0 warnings)
+
+== G3 unit tests ==
+PASS
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+== G4 WebUI JS syntax ==
+PASS (node --check, rc 0)
+
+== G5 browser regression ==
+PASS (Chromium headless, 1600x1100, final embedded WebUI)
+- version footer: ChronoSync v1.0.2 · STANDARD TIME VIA NTP
+- log viewport: 330 px (~10 lines)
+- action order: 扫描 / 添加设备 / 清除设备 / 下载日志
+- clear button disabled on empty list; confirmation clears rows and saved password store; logs retained
+- remember password default OFF; no localStorage entry while OFF; password restored after reload only while ON
+- username restored in both modes
+- scan modal present and cancel works
+- console errors: 0, page errors: 0
+
+== G6 install syntax / dry-run ==
+PASS
+sh -n install.sh: OK
+[chronosync] ChronoSync v1.0.2 安装计划（dry-run，不修改系统）
+[chronosync] 系统类型 : systemd
+[chronosync] 二进制   : /bin/true
+[chronosync] 安装目录 : /opt/chronosync
+[chronosync] 日志目录 : /var/log/chronosync
+[chronosync] 监听地址 : 0.0.0.0:8686
+[chronosync] 访问认证 : 未启用
+[chronosync] 将安装 : /etc/systemd/system/chronosync.service
+
+== G7 platform build and startup metadata ==
+PASS
+x86-64-v1  x86_64-unknown-linux-gnu  20261105-200000  health 200
+x86-64-v2  x86_64-unknown-linux-gnu  20261105-200000  health 200
+x86-64-v3  x86_64-unknown-linux-gnu  20261105-200000  health 200
+x86-64-v4  x86_64-unknown-linux-gnu  20261105-200000  health 200
+generic    x86_64-pc-windows-gnu      20261105-200000  health 200
+armv8-a    aarch64-unknown-linux-gnu  20261105-200000  health 200 (real ARM64 host)
+
+== G8 real-device read-only tests ==
+PASS (dry_run=true; no clock writes)
+- Linux x86 v1: 12 targets, 11 checked, 1 unreachable, 11 drift readings, 2585 ms
+- Windows generic: 1 target checked, health 200
+- ARM64 armv8a: native aarch64 startup, health 200, version 1.0.2
+- Remote test artifact and logs cleaned up after ARM64 test
+
+== G9 package content, labels, and SHA256 ==
+PASS
+- 7 archives extracted successfully; root names include version/platform/CPU/timestamp
+- all six binaries match the release build SHA256
+- Linux binaries execute and report 1.0.2
+- Windows .bat files use CRLF
+- source archive excludes target/dist/logs/reports and contains source, docs, installer, packaging
+- sha256sum -c SHA256SUMS: all OK
+- tar contents fixed at 2026-11-05 20:00:00 local time; no future-timestamp warnings
+
+== G10 sensitive data scan ==
+PASS
+- exact GitHub token occurrences: 0
+- exact real SSH password values: 0
+- real internal IP addresses: 0
+- sensitive target hostnames: 0
+- token-like patterns in text: 0
+- scan covered working tree and all extracted release archives
+- binaries checked for exact token/password values; generic build-ID-style hex excluded from false positives
+
+== G11 version consistency ==
+PASS
+- Cargo.toml: 1.0.2
+- Cargo.lock root package: 1.0.2
+- WebUI footer: 1.0.2
+- install.sh VERSION: 1.0.2
+- README/CHANGELOG/reports: 1.0.2
+- package names and BUILD-INFO: 1.0.2
+- stale release-version references outside dependency versions: 0
+- stale pre-release package timestamps: 0
+
+== G12 auto-port fallback on any bind error ==
+PASS
+- Linux: non-root start at 1015, permission-denied ports skipped, bound 1024, health 200
+- Windows: port 445 returned 10013, automatically switched to 446, health 200, 447 not listening
+- final binaries rebuilt after the fix
+
+== G13 GitHub release and read-back ==
+PENDING (to be completed after commit/tag push and asset upload)

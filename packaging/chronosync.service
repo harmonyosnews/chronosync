@@ -1,0 +1,17 @@
+[Unit]
+Description=ChronoSync multi-host time calibration console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/chronosync
+# install.sh generates this unit with the selected bind/port/log directory.
+# The generated service runs as root for local clock/RTC calibration.
+User=root
+ExecStart=/opt/chronosync/run.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,36 @@
+[package]
+name = "chronosync"
+version = "1.0.2"
+edition = "2024"
+rust-version = "1.89"
+description = "ChronoSync — 通过 SSH 批量校准 Linux 设备时间的中文 Web 控制台"
+license = "MIT"
+repository = "https://github.com/harmonyosnews/chronosync"
+homepage = "https://github.com/harmonyosnews/chronosync"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.8", features = ["json"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive", "env"] }
+libc = "0.2"
+if-addrs = "0.15"
+dns-lookup = "4"
+russh = { version = "0.65", default-features = false, features = ["ring", "rsa"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "sync", "fs", "process", "signal"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_System_SystemInformation",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
