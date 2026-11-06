@@ -21,8 +21,7 @@ Build: 20261106-133000
 == G12 auto-port == PASS (final 1.2.0: 1015 denied -> 1024 bound, health 200)
 == G13 release == PASS
 - tag v1.2.0 -> dcc36d0; Release ID 436114558
-- initial assets 8, GitHub digest matched
-- reports uploaded after this log update
+- initial assets 8 + reports/manual = 13, GitHub digest matched
 
 == G15 deployment == PASS
 - 11/11 accessible validation hosts installed 1.2.0

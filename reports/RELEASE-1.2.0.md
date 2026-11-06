@@ -47,12 +47,12 @@
 - Linux ARM64 armv8a static
 - Windows x86_64 generic
 - source、SHA256SUMS、build/cluster/deployment reports
-- 可打印使用手册 `ChronoSync-使用手册-v1.2.0.pdf`（17 页）
+- 可打印使用手册 `ChronoSync-User-Manual-v1.2.0.pdf`（17 页；仓库内文件名为中文）
 
 ## 5. 发布后回填
 
 - Release ID：`436114558`
 - 冻结 commit：`dcc36d00471fd7cc536fcaec7c21cd0eb7728d02`
 - annotated tag：`v1.2.0`
-- 8 个初始资产已上传并完成 GitHub digest 回读
+- 初传 8 个资产 + 5 个报告/手册资产 = 13 个，均已回读 digest
 - 11 台验证机部署完成；详见 `reports/DEPLOYMENT-1.2.0.md`

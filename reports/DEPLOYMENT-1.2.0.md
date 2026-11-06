@@ -7,6 +7,7 @@
 | 范围 | 11 台可达验证机；`.205` 不可达，剔除 |
 | 方式 | 静态包上传 + `install.sh install --no-start`，随后启动服务 |
 | 时钟策略 | `auto_apply=false`；未执行时间写入 |
+| 部署后状态 | 11/11 服务运行；1 server + 10 client；全部 applied=false |
 | 集群 | `.230` 手动 server；其余 10 台 client，seed `.230:18686` |
 | 密钥 | 部署密钥仅存在目标 `/opt/chronosync/cluster.key`（0600），未写入仓库 |
 
