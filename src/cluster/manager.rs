@@ -243,13 +243,8 @@ impl Cluster {
                     return;
                 }
 
-                let accept = match &state.server {
-                    None => true,
-                    Some(current) => {
-                        message.term > current.term
-                            || (message.term == current.term && message.node_id < current.node_id)
-                    }
-                };
+                let accept =
+                    accept_heartbeat(state.server.as_ref(), &message.node_id, message.term);
                 if accept {
                     let changed = state
                         .server
@@ -765,6 +760,19 @@ async fn sync_once(
     Ok(())
 }
 
+fn accept_heartbeat(current: Option<&Peer>, incoming_node: &str, incoming_term: u64) -> bool {
+    match current {
+        None => true,
+        // A heartbeat from the current server must refresh its lease; otherwise
+        // every client would falsely time it out after 3.5 seconds.
+        Some(server) if server.node_id == incoming_node => true,
+        Some(server) => {
+            incoming_term > server.term
+                || (incoming_term == server.term && incoming_node < server.node_id.as_str())
+        }
+    }
+}
+
 fn offset_and_rtt(t1: i64, t2: i64, t3: i64, t4: i64) -> Option<(i64, u64)> {
     let offset = ((t2 - t1) as i128 + (t3 - t4) as i128) / 2;
     let rtt = (t4 - t1) as i128 - (t3 - t2) as i128;
@@ -803,6 +811,20 @@ mod tests {
         for _ in 0..100 {
             assert!(random_delay() < Duration::from_secs(2));
         }
+    }
+
+    #[test]
+    fn heartbeat_from_current_server_refreshes_lease() {
+        let current = Peer {
+            node_id: "server-a".to_string(),
+            addr: SocketAddr::from(([127, 0, 0, 1], 18687)),
+            discovery_addr: SocketAddr::from(([127, 0, 0, 1], 18686)),
+            term: 1,
+            last_seen: Instant::now(),
+        };
+        assert!(accept_heartbeat(Some(&current), "server-a", 1));
+        assert!(!accept_heartbeat(Some(&current), "server-b", 1));
+        assert!(accept_heartbeat(Some(&current), "server-b", 2));
     }
 
     #[test]

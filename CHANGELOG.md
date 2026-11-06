@@ -1,22 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Documentation
-
-- 新增项目文档基线：项目书、可行性分析、实施方案、开发手册、程序接口、实测证据与复现、实施与验收记录、审计报告、纪律与闸门、Issues 整理、静态编译文档。
-- 新增根目录 `使用手册.md`、`项目管理与排期.md`、`工程纪律.md`、`AGENTS.md`。
-- 新增 `docs/README.md` 文档索引，明确 API、闸门、排期、证据的单一事实源，减少重复维护。
-- 新增 `docs/集群模式详细设计与排期.md`：1.1.0 Server/Client 自动选举的协议、状态机、安全、测试与 7–8 周排期草案（未实现）。
-- 完成仓库科学性/逻辑性/鲁棒性/归一化/冗余审计；代码去重候选登记到 Issues，未修改已发布 1.0.2 运行时。
-- 24 小时长稳测试按项目决定取消，不列入本版交付或闸门。
-
-### Changed
-
-- README 增加文档地图和项目结构说明。
-- 无运行时、安装器、WebUI、依赖或发布资产变更。
-
-## Unreleased — 1.1.0 cluster mode (in progress)
+## 1.1.0 - 2026-11-06
 
 ### Added
 
@@ -27,9 +11,26 @@
 - 后台 NTP 周期刷新；参考年龄超过 5 分钟的 server 停止供时。
 - 版本提升到 1.1.0；Linux v1–v4、Windows generic 启动验证。
 - ARM64 双节点 server/client、ARM server + Windows client 跨主机取时验证通过。
+- 9 节点真实矩阵稳定通过（ARM server + 8 client，10s/20s 两次采样保持同一 server）。
+- 修复 client 对当前 server 心跳未续租导致周期性误判失联的缺陷；新增回归测试。
 - 本地验证：手动 server/client、两节点自动选举、server 退出重选、错误密钥/未验证 NTP 拒绝、非 root 自动写入安全拒绝。
 - 12 台真实目标可达性盘点：11 台可达，1 台生产发布机不可达。
-- 当前不发布 1.1.0；多主机广播阻断/分区矩阵、实际 root 安装、完整闸门和独立 Release 待完成。
+
+### Documentation
+
+- 新增根目录 `使用手册.md`、`项目管理与排期.md`、`工程纪律.md`、`AGENTS.md`。
+- 新增 `docs/README.md` 文档索引，明确 API、闸门、排期、证据的单一事实源，减少重复维护。
+- 新增 `docs/集群模式详细设计与排期.md`：1.1.0 Server/Client 自动选举的协议、状态机、安全、测试与排期。
+- 完成仓库科学性/逻辑性/鲁棒性/归一化/冗余审计；代码去重候选登记到 Issues。
+- 24 小时长稳测试按项目决定取消，不列入本版交付或闸门。
+- README 增加文档地图、集群说明和项目结构。
+
+### Known Limitations
+
+- Innuos（glibc 2.31）和 RoonServer（缺少动态加载器）不能运行当前动态包。
+- systemd root 安装/卸载已实测；OpenRC/procd/AudioSys 仍只做 dry-run/逻辑审查。
+- 未完成广播阻断、分区脑裂、跨网段自动选举的完整故障矩阵。
+- 静态 musl 包未提供。
 
 ## 1.0.2 - 2026-11-05
 

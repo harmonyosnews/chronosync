@@ -1,0 +1,82 @@
+ChronoSync v1.1.0 gates
+2026-11-06
+Build: 20261106-130000
+Version: 1.1.0
+
+== G1 fmt ==
+PASS (cargo fmt --check, no diff)
+
+== G2 clippy ==
+PASS (cargo clippy --all-targets -- -D warnings; 0 warnings)
+
+== G3 unit tests ==
+PASS
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+== G4 WebUI JS syntax ==
+PASS (node --check, rc 0)
+
+== G5 browser regression ==
+PASS
+- version footer: ChronoSync v1.1.0
+- cluster badge: Server/Client visible
+- clear/remember/scan/log controls retained
+- console errors: 0, page errors: 0
+
+== G6 installer ==
+PASS
+- sh -n install.sh: OK
+- dry-run: systemd + cluster mode/key plan
+- generated run.sh syntax: OK
+- key generation: 64 bytes hex, mode 600, state dir 700
+- actual root install --no-start on x86 test VM: PASS; service inactive
+- actual uninstall --purge: PASS; /opt and unit removed
+
+== G7 platform build/startup ==
+PASS
+- Linux x86 v1-v4 1.1.0: health 200, build metadata correct
+- Windows generic 1.1.0: health 200, cluster server state
+- ARM64 armv8a 1.1.0: health 200, cluster server/client test
+
+== G8 real-device read-only matrix ==
+PASS (no clock writes)
+- 9 nodes: ARM server + 8 client; 10s/20s same server_id, last_error=null
+- all clients applied=false
+- ARM/Windows cross-host: offset 295ms, rtt 1ms; 22s heartbeat stable
+- incompatible: Innuos glibc 2.31; RoonServer loader missing
+- one production host unreachable; excluded from matrix
+
+== G9 package/hash ==
+PASS
+- 7 archives extracted; binary hashes match build outputs
+- BUILD-INFO contains 1.1.0 / 20261106-130000 / target / variant
+- sha256sum -c SHA256SUMS: all OK
+- Windows bat CRLF
+- source package excludes target/dist/logs/reports
+
+== G10 sensitive data scan ==
+PASS
+- token: 0
+- real password: 0
+- real internal IP: 0
+- sensitive hostname: 0
+- scan covered repo and extracted packages
+
+== G11 version consistency ==
+PASS
+- Cargo.toml/Cargo.lock: 1.1.0
+- WebUI/install.sh: 1.1.0
+- package names/BUILD-INFO: 1.1.0
+- old release references outside history: 0
+
+== G12 auto-port ==
+PASS (existing logic retained; Linux permission-error fallback and Windows 445->446 previously verified)
+
+== G13 release read-back ==
+PENDING (upload and public digest check)
+
+== G14 documentation ==
+PASS
+- 123 relative links checked, 0 missing
+- docs/index/API/CHANGELOG version aligned
+- no unqualified claims of static build or 24h test

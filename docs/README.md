@@ -6,15 +6,17 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 产品版本 | `1.0.2` 已发布；`1.1.0` 集群模式开发中（`feat/cluster-mode`） |
-| 发布 tag | `v1.0.2`（commit `a3a37b9`） |
-| 发布页 | <https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2> |
+| 产品版本 | `1.1.0` |
+| 发布 tag | `v1.1.0`（发布后以 tag 指向的冻结 commit 为准） |
+| 发布页 | <https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0> |
 | 文档基线日期 | 2026-11-06 |
-| 运行时状态 | 1.0.2 已发布二进制未修改；1.1.0 集群代码仅在 feature 分支，未发布 |
+| 运行时状态 | 1.1.0 六平台发布包；1.0.2 历史资产保留 |
 | 长稳测试 | 24 小时长稳测试项已按项目决定取消，不列入本版交付或闸门 |
-| 下一版本 | **1.1.0 集群模式 MVP**（`feat/cluster-mode`，未发布）；见 `集群模式详细设计与排期.md`；代码级优化候选见 `Issues整理.md` |
+| 后续版本 | 未排期；代码优化/静态构建候选见 `Issues整理.md` |
 
-> 文档提交发生在 `v1.0.2` 发布之后。任何运行时或安装器修改都必须进入新版本流程；不能直接改写已发布 tag 或 Release 资产。
+> 1.1.0 的 tag 和 Release 资产在发布后冻结；任何后续运行时或安装器修改都必须进入新版本流程。
+
+> 版本说明：项目书、可行性分析、实施方案、开发手册、审计报告中的 1.0.2 数字是历史基线；1.1.0 集群模式的当前证据以 `reports/RELEASE-1.1.0.md`、`BUILD-1.1.0.md`、`CLUSTER-TESTS-1.1.0.md` 为准。
 
 ## 2. 文档地图
 
@@ -41,11 +43,11 @@
 
 发布证据原始材料在 `reports/`：
 
-- [发布报告](../reports/RELEASE-1.0.2.md)
-- [构建与包校验](../reports/BUILD-1.0.2.md)
-- [真机只读测试](../reports/REAL-DEVICE-TESTS-1.0.2.md)
+- [发布报告](../reports/RELEASE-1.1.0.md)
+- [构建与包校验](../reports/BUILD-1.1.0.md)
 - [1.1.0 集群测试](../reports/CLUSTER-TESTS-1.1.0.md)
-- [闸门日志](../reports/gates-1.0.2.log)
+- [1.0.2 历史发布报告](../reports/RELEASE-1.0.2.md)
+- [1.0.2 历史闸门日志](../reports/gates-1.0.2.log)
 
 ## 3. 阅读路径
 
