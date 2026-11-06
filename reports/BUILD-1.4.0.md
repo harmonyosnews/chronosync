@@ -31,9 +31,9 @@
 | linux-x86_64-v4-static | 3198319 | `49885174611d2ad996cdb4c6471246cdf6509f42775f93d6e313f06ce1f54db6` |
 | linux-arm64-armv8a-static | 3119195 | `a5df98a7f3e17372e910eb25c05fd081b9dbf46754adfbcafa9f87a870230827` |
 | windows-x86_64-generic | 3137307 | `70e1fc88725d98479059f0d5565bf60befed7608beecb5dfaf91924199f6157a` |
-| source | 1496091 | `612f4e46b45d587e1109c46605e3dcf7713a3cbe9badb9fd1c3cb07d10ec1551` |
+| source | 1497540 | `6fd7e5c83326d4897a1624277cc16f5e6dbffea7d97ccecbc905f7ccb94af82a` |
 
-`SHA256SUMS`：`8c2e085c434fad231c4bec00465d2217319e6a9357ef1a54f7c74c725a226411`；`sha256sum -c` 全 OK；包内二进制与构建产物一致。
+`SHA256SUMS`：`5a268fe2d0394f3f3a53893b63225f5046fe09513fd7c929c7314f29d2a3ea2c`；`sha256sum -c` 全 OK；包内二进制与构建产物一致。
 
 ## 3. 包校验
 

@@ -1,12 +1,14 @@
 # ChronoSync v1.4.0 发布报告
 
-- 状态：**已构建、11 台验证机部署与真机只读验证完成；待冻结提交/Release 回读**
+- 状态：**已发布并部署**
 - 目标仓库：`https://github.com/harmonyosnews/chronosync`
 - 版本：**1.4.0**
 - 目标 tag：`v1.4.0`
 - 构建时间：`20261106-150000`
-- 冻结 commit / Release ID：待回填
-- 发布页：待回填
+- 冻结 commit：`5531d3c2ac893a00e0c6d8b29fe0f4718547fad8`
+- annotated tag：`v1.4.0` → `2fe9ed9cca70156ce821a362a81a9b876ab264fa`
+- Release ID：`436232931`
+- 发布页：`https://github.com/harmonyosnews/chronosync/releases/tag/v1.4.0`
 
 ## 1. 本版重点
 
@@ -45,7 +47,7 @@
 - Windows x86_64 generic
 - source
 
-另附 `SHA256SUMS`、本报告、构建报告、部署记录、WebUI 控制验证、使用手册 PDF、闸门日志。
+另附 `SHA256SUMS`、本报告、构建报告、部署记录、WebUI 控制验证、使用手册 PDF、闸门日志；共 14 个资产，GitHub digest 回读匹配。
 
 ## 4. 安装
 
@@ -78,6 +80,9 @@ sudo ./install.sh install --no-start --bind 0.0.0.0 \
 
 ## 6. 发布后回填
 
-- 冻结 commit / annotated tag / Release ID / URL：待填。
-- 14 个资产 digest 回读：待填。
-- 11 台验证机已部署 1.4.0；发布后核对 Release 包与已部署二进制哈希一致。
+- 仓库：`harmonyosnews/chronosync`，公开仓库，默认分支 `main`。
+- tag：`v1.4.0`，annotated tag `2fe9ed9cca70156ce821a362a81a9b876ab264fa` → 冻结 commit `5531d3c2ac893a00e0c6d8b29fe0f4718547fad8`。
+- Release：ID `436232931`，`https://github.com/harmonyosnews/chronosync/releases/tag/v1.4.0`。
+- 14 个资产全部上传并做 GitHub digest 回读；x86 v1 包、`SHA256SUMS`、手册 PDF 做公开下载字节比对。
+- 11 台验证机已部署 1.4.0；已部署二进制 SHA256 与 Release Linux/ARM 包内二进制一致。
+- 发布后的文档回填只修改报告/闸门状态，不改二进制、源包或 tag。
