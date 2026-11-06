@@ -1,0 +1,19 @@
+ChronoSync v1.5.0 gates
+2026-11-06 / build 20261106-170000
+
+G1 fmt PASS
+G2 clippy PASS (0 warnings)
+G3 tests PASS (41; includes auto_apply policy)
+G4 WebUI JS PASS
+G5 browser PASS (auto_apply confirm/on/off; 7 widths; console/page errors 0)
+G6 installer PASS (sh -n; dry-run 0.0.0.0; 11 uninstall/reinstall)
+G7 platform PASS (x86 v1-v4, ARM64, Windows build+health; Windows auto-port 18890)
+G8 real-device read-only PASS (11/11; 1 server + 10 client; auto_apply=false; applied=false; last_error=null)
+G9 package PASS (7 archives; SHA256SUMS; binary hashes; Windows CRLF)
+G10 sensitive PASS (token/private key/real private IPv4/AWS key = 0)
+G11 version PASS (1.5.0 source/UI/installer/packages)
+G12 auto-port PASS (Linux 18890->18891; Windows 18889->18890)
+G13 release read-back PENDING (no Release yet)
+G14 docs links PASS (39 markdown; 138 relative links; 0 missing)
+
+Additional: real client auto_apply true->false state/runtime.json persisted; no clock write; NTPv4 toggle 48B/LI0/VN4/mode4/stratum3; restart instance_id change.

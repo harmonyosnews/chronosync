@@ -1687,6 +1687,11 @@
           <span class="switch-track"><span class="switch-thumb"></span></span>
           <span>NTPv4 服务 <small id="ntp123-port-label">UDP 123</small></span>
         </label>
+        <label class="switch" title="client 在偏差超过阈值且不超过最大步长时自动写入本机时间">
+          <input id="opt-auto-apply" type="checkbox" disabled>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span>自动写入本机时间 <small id="auto-apply-policy">阈值 100 ms</small></span>
+        </label>
         <label class="switch" title="手动把本机固定为集群 Server；关闭后按启动模式降级">
           <input id="opt-manual-server" type="checkbox" disabled>
           <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -1783,7 +1788,7 @@
   </main>
 
   <footer class="page-footer">
-    <span>ChronoSync v1.4.0 · STANDARD TIME VIA NTP</span>
+    <span>ChronoSync v1.5.0 · STANDARD TIME VIA NTP</span>
     <span><svg class="icon" style="width:11px;height:11px"><use href="#i-shield"></use></svg> 密码默认不落盘 · 仅限可信内网使用</span>
   </footer>
 </div>
@@ -1894,7 +1899,7 @@
     const ids = [
       "cluster-status", "cluster-status-text",
       "cluster-controls", "cluster-control-tag", "cluster-control-note",
-      "opt-ntp123", "ntp123-port-label", "opt-manual-server", "restart-program",
+      "opt-ntp123", "ntp123-port-label", "opt-auto-apply", "auto-apply-policy", "opt-manual-server", "restart-program",
       "server-status", "server-status-text", "refresh-ref",
       "sync-all", "sync-all-label", "sync-local", "sync-local-label", "local-hint",
       "opt-hwclock", "opt-timezone", "opt-dryrun",
@@ -1932,6 +1937,7 @@
     ui.refreshRef.addEventListener("click", refreshReference);
     ui.warningRefresh.addEventListener("click", refreshReference);
     ui.optNtp123.addEventListener("change", onNtp123Toggle);
+    ui.optAutoApply.addEventListener("change", onAutoApplyToggle);
     ui.optManualServer.addEventListener("change", onManualServerToggle);
     ui.restartProgram.addEventListener("click", onRestartProgram);
     ui.downloadLogs.addEventListener("click", downloadLogs);
@@ -2474,6 +2480,7 @@
     const active = !!cluster;
     const locked = state.clusterSaving || state.restarting || state.offline || isBusy();
     ui.optNtp123.disabled = !active || locked;
+    ui.optAutoApply.disabled = !active || locked || cluster?.role !== "client";
     ui.optManualServer.disabled = !active || locked;
     ui.restartProgram.disabled = state.restarting || state.offline || isBusy()
       || state.server?.restart_supported === false;
@@ -2481,8 +2488,15 @@
       ? "当前平台不支持 WebUI 内重启，请使用服务管理器或启动脚本"
       : "重启 ChronoSync 进程";
     ui.ntp123PortLabel.textContent = cluster ? "UDP " + cluster.ntp123_port : "UDP 123";
+    ui.autoApplyPolicy.textContent = cluster
+      ? `阈值 ${cluster.max_offset_ms} ms`
+      : "阈值 100 ms";
+    ui.optAutoApply.title = cluster
+      ? `自动写入本机时间：阈值 ${cluster.max_offset_ms}ms，最大步长 ${cluster.max_step_ms}ms，大步长${cluster.allow_large_step ? "允许" : "拒绝"}；仅 client 生效`
+      : "集群模式未启用";
     if (!state.clusterSaving) {
       ui.optNtp123.checked = !!cluster?.ntp123;
+      ui.optAutoApply.checked = !!cluster?.auto_apply;
       ui.optManualServer.checked = !!cluster?.manual_server;
     }
     if (!cluster) {
@@ -2501,8 +2515,10 @@
       `mode=${cluster.mode}`,
       `term=${cluster.term}`,
       `peers=${cluster.peers}`,
-      `NTPv4 ${cluster.ntp123 ? "开" : "关"}`
+      `NTPv4 ${cluster.ntp123 ? "开" : "关"}`,
+      `自动写入 ${cluster.auto_apply ? "开" : "关"}`
     ];
+    if (cluster.auto_apply) parts.push(`阈值 ${cluster.max_offset_ms}ms · 步长 ${cluster.max_step_ms}ms · 大步长${cluster.allow_large_step ? "允许" : "拒绝"}`);
     if (cluster.ntp123_error) parts.push("NTPv4 错误：" + cluster.ntp123_error);
     else if (cluster.manual_server && !cluster.ntp_verified) parts.push("上游 NTP 未验证，Server 不会供时");
     else if (cluster.last_error) parts.push(cluster.last_error);
@@ -2541,6 +2557,51 @@
     } catch (error) {
       ui.optNtp123.checked = !desired;
       showToast("NTPv4 切换失败：" + error.message, "error");
+      updateClusterControls(state.server?.cluster || null);
+    } finally {
+      state.clusterSaving = false;
+      updateControls();
+    }
+  }
+
+  function onAutoApplyToggle() {
+    const desired = ui.optAutoApply.checked;
+    const cluster = state.server?.cluster;
+    const current = !!cluster?.auto_apply;
+    if (!cluster || state.clusterSaving || state.restarting || cluster.role !== "client") {
+      updateClusterControls(cluster || null);
+      return;
+    }
+    // Do not let a click visually enable writes before confirmation.
+    ui.optAutoApply.checked = current;
+    if (desired === current) return;
+    if (!desired) {
+      applyAutoApply(false);
+      return;
+    }
+    openConfirm({
+      title: "启用集群自动写入本机时间？",
+      description: `client 每轮集群取时后，偏差绝对值超过 ${cluster.max_offset_ms}ms 且不超过 ${cluster.max_step_ms}ms 时，会直接写入本机系统时钟；超过最大步长${cluster.allow_large_step ? "仍会写入（已允许大步长）" : "将拒绝写入"}。`,
+      targets: null,
+      options: null,
+      chips: [`阈值 ${cluster.max_offset_ms}ms`, `最大步长 ${cluster.max_step_ms}ms`, cluster.allow_large_step ? "允许大步长" : "拒绝大步长"],
+      confirmLabel: "启用自动写入",
+      onConfirm: () => applyAutoApply(true)
+    });
+  }
+
+  async function applyAutoApply(enabled) {
+    state.clusterSaving = true;
+    updateControls();
+    try {
+      const updated = await updateClusterSettings({ auto_apply: enabled });
+      state.server.cluster = updated;
+      updateClusterUi(updated);
+      showToast(enabled
+        ? `自动写入已开启 · 阈值 ${updated.max_offset_ms}ms`
+        : "自动写入已关闭，仅检测", enabled ? "warn" : "success");
+    } catch (error) {
+      showToast("自动写入切换失败：" + error.message, "error");
       updateClusterControls(state.server?.cluster || null);
     } finally {
       state.clusterSaving = false;

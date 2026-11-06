@@ -11,6 +11,8 @@ pub struct Settings {
     pub manual_server: Option<bool>,
     #[serde(default)]
     pub ntp123: Option<bool>,
+    #[serde(default)]
+    pub auto_apply: Option<bool>,
 }
 
 impl Settings {
@@ -116,6 +118,7 @@ mod tests {
         let settings = Settings {
             manual_server: Some(true),
             ntp123: Some(false),
+            auto_apply: Some(true),
         };
         settings.save(&path).unwrap();
         let (loaded, warning) = Settings::load(&path);

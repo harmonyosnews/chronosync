@@ -1,4 +1,4 @@
-ChronoSync v1.4.0 - Windows x86_64
+ChronoSync v1.5.0 - Windows x86_64
 =================================
 
 直接双击 start-chronosync.bat。

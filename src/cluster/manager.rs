@@ -114,6 +114,9 @@ pub struct ClusterView {
     pub ntp123_error: Option<String>,
     pub manual_server: bool,
     pub auto_apply: bool,
+    pub max_offset_ms: i64,
+    pub max_step_ms: i64,
+    pub allow_large_step: bool,
     pub last_sync: Option<SyncView>,
     pub last_error: Option<String>,
 }
@@ -145,6 +148,7 @@ pub struct Cluster {
     seq: AtomicU64,
     seeds: Vec<SocketAddr>,
     manual_server: AtomicBool,
+    auto_apply: AtomicBool,
     ntp123_active: AtomicBool,
     ntp123_error: Mutex<Option<String>>,
     ntp123_op: AsyncMutex<()>,
@@ -182,7 +186,10 @@ impl Cluster {
             ntp123_port: self.cfg.ntp123_port,
             ntp123_error: lock(&self.ntp123_error).clone(),
             manual_server,
-            auto_apply: self.cfg.auto_apply,
+            auto_apply: self.auto_apply.load(Ordering::SeqCst),
+            max_offset_ms: self.cfg.max_offset_ms,
+            max_step_ms: self.cfg.max_step_ms,
+            allow_large_step: self.cfg.allow_large_step,
             last_sync: state.last_sync.clone(),
             last_error: state.last_error.clone(),
         }
@@ -257,6 +264,38 @@ impl Cluster {
             );
         }
         Ok(())
+    }
+
+    /// Enable/disable automatic writes for this cluster client. Thresholds and
+    /// the large-step guard remain the immutable startup policy; this switch
+    /// only decides whether that policy may write.
+    pub fn set_auto_apply(&self, enabled: bool) -> Result<(), String> {
+        let previous = self.auto_apply.swap(enabled, Ordering::SeqCst);
+        if previous == enabled {
+            return Ok(());
+        }
+        self.sink.log(
+            if enabled { "warn" } else { "system" },
+            if enabled {
+                format!(
+                    "WebUI 已启用自动写入 · 阈值 {}ms · 最大步长 {}ms · 大步长{}",
+                    self.cfg.max_offset_ms,
+                    self.cfg.max_step_ms,
+                    if self.cfg.allow_large_step {
+                        "允许"
+                    } else {
+                        "拒绝"
+                    }
+                )
+            } else {
+                "WebUI 已关闭自动写入，仅检测".to_string()
+            },
+        );
+        Ok(())
+    }
+
+    fn auto_apply_enabled(&self) -> bool {
+        self.auto_apply.load(Ordering::SeqCst)
     }
 
     /// Start or stop the standard NTPv4 listener without restarting the process.
@@ -729,6 +768,7 @@ pub async fn start(
     let now = Instant::now();
     let role = initial_role(&cfg);
     let manual_server = cfg.manual_server;
+    let auto_apply = cfg.auto_apply;
     let cluster = Arc::new(Cluster {
         inner: Arc::new(Mutex::new(Inner {
             role,
@@ -754,6 +794,7 @@ pub async fn start(
         seq: AtomicU64::new(0),
         seeds,
         manual_server: AtomicBool::new(manual_server),
+        auto_apply: AtomicBool::new(auto_apply),
         ntp123_active: AtomicBool::new(false),
         ntp123_error: Mutex::new(None),
         ntp123_op: AsyncMutex::new(()),
@@ -912,30 +953,33 @@ async fn sync_once(
     offsets.sort_unstable();
     let offset_ms = offsets[offsets.len() / 2];
     let rtt_ms = samples.iter().map(|(_, rtt)| *rtt).min().unwrap_or(0);
+    let decision = auto_apply_decision(
+        cluster.auto_apply_enabled(),
+        offset_ms,
+        cluster.cfg.max_offset_ms,
+        cluster.cfg.max_step_ms,
+        cluster.cfg.allow_large_step,
+    );
     let mut applied = false;
-    let mut message = if cluster.cfg.auto_apply {
-        "仅记录，未写入".to_string()
-    } else {
-        "自动写入已关闭，仅检测".to_string()
+    let mut message = match decision {
+        ApplyDecision::Disabled => "自动写入已关闭，仅检测".to_string(),
+        ApplyDecision::WithinThreshold => format!("偏差 {offset_ms}ms 在阈值内，不写入"),
+        ApplyDecision::RejectLargeStep => {
+            format!("偏差 {}ms 超过大步长阈值，拒绝写入", offset_ms.abs())
+        }
+        ApplyDecision::Apply => "准备写入本机时间".to_string(),
     };
-
-    if cluster.cfg.auto_apply && offset_ms.abs() > cluster.cfg.max_offset_ms {
-        if offset_ms.abs() > cluster.cfg.max_step_ms && !cluster.cfg.allow_large_step {
-            message = format!("偏差 {}ms 超过大步长阈值，拒绝写入", offset_ms.abs());
-        } else {
-            let target = ntp::system_epoch_ms().saturating_add(offset_ms);
-            match cluster.sink.apply_time(target) {
-                Ok(()) => {
-                    applied = true;
-                    message = format!("已写入本机时间，offset={offset_ms}ms");
-                }
-                Err(err) => {
-                    message = format!("写入失败：{err}");
-                }
+    if decision == ApplyDecision::Apply {
+        let target = ntp::system_epoch_ms().saturating_add(offset_ms);
+        match cluster.sink.apply_time(target) {
+            Ok(()) => {
+                applied = true;
+                message = format!("已写入本机时间，offset={offset_ms}ms");
+            }
+            Err(err) => {
+                message = format!("写入失败：{err}");
             }
         }
-    } else if cluster.cfg.auto_apply {
-        message = format!("偏差 {offset_ms}ms 在阈值内，不写入");
     }
 
     let view = SyncView {
@@ -965,6 +1009,33 @@ fn accept_heartbeat(current: Option<&Peer>, incoming_node: &str, incoming_term: 
                 || (incoming_term == server.term && incoming_node < server.node_id.as_str())
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ApplyDecision {
+    Disabled,
+    WithinThreshold,
+    RejectLargeStep,
+    Apply,
+}
+
+fn auto_apply_decision(
+    enabled: bool,
+    offset_ms: i64,
+    max_offset_ms: i64,
+    max_step_ms: i64,
+    allow_large_step: bool,
+) -> ApplyDecision {
+    if !enabled {
+        return ApplyDecision::Disabled;
+    }
+    if offset_ms.abs() <= max_offset_ms {
+        return ApplyDecision::WithinThreshold;
+    }
+    if offset_ms.abs() > max_step_ms && !allow_large_step {
+        return ApplyDecision::RejectLargeStep;
+    }
+    ApplyDecision::Apply
 }
 
 fn offset_and_rtt(t1: i64, t2: i64, t3: i64, t4: i64) -> Option<(i64, u64)> {
@@ -1068,5 +1139,38 @@ mod runtime_mode_tests {
         assert_eq!(fallback_role(Mode::Server), Role::Client);
         assert_eq!(fallback_role(Mode::Auto), Role::Discovering);
         assert_eq!(fallback_role(Mode::Client), Role::Client);
+    }
+}
+
+#[cfg(test)]
+mod auto_apply_policy_tests {
+    use super::*;
+
+    #[test]
+    fn disabled_never_applies_even_for_large_offset() {
+        assert_eq!(
+            auto_apply_decision(false, 5_000, 100, 5_000, true),
+            ApplyDecision::Disabled
+        );
+    }
+
+    #[test]
+    fn threshold_and_large_step_policies_are_reused() {
+        assert_eq!(
+            auto_apply_decision(true, 100, 100, 5_000, false),
+            ApplyDecision::WithinThreshold
+        );
+        assert_eq!(
+            auto_apply_decision(true, -101, 100, 5_000, false),
+            ApplyDecision::Apply
+        );
+        assert_eq!(
+            auto_apply_decision(true, 5_001, 100, 5_000, false),
+            ApplyDecision::RejectLargeStep
+        );
+        assert_eq!(
+            auto_apply_decision(true, -5_001, 100, 5_000, true),
+            ApplyDecision::Apply
+        );
     }
 }

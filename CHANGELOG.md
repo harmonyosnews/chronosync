@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.5.0 - 2026-11-06
+
+### Added
+
+- WebUI 集群控制条新增“自动写入本机时间”开关；仅对集群 client 生效。
+- `auto_apply` 支持运行时热切换并写入 `runtime.json`（0600），重启后保持。
+- 控制条显示 `max_offset_ms`、`max_step_ms` 和大步长策略；开启前必须确认。
+- `ClusterView` 暴露阈值/步长/大步长字段；`POST /api/cluster/settings` 接受 `auto_apply`。
+- 抽取 `auto_apply_decision` 策略并补单元测试，覆盖关闭、阈值内、超大步长拒绝、允许大步长。
+
+### Changed
+
+- `auto_apply` 从不可变启动配置改为 `AtomicBool` 运行时状态；默认仍为关闭。
+- 版本提升到 1.5.0。
+
+### Security / Limits
+
+- 默认关闭；部署不主动写时钟。
+- 仍复用原阈值/大步长保护，不新增绕过参数。
+- 自动写入会影响本机时钟，必须在维护窗口确认 offset 后开启。
+
 ## 1.4.0 - 2026-11-06
 
 ### Added

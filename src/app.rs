@@ -1322,6 +1322,8 @@ pub struct ClusterSettingsRequest {
     pub ntp123: Option<bool>,
     #[serde(default)]
     pub manual_server: Option<bool>,
+    #[serde(default)]
+    pub auto_apply: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -1334,10 +1336,10 @@ async fn update_cluster_settings(
     State(app): State<Arc<App>>,
     Json(request): Json<ClusterSettingsRequest>,
 ) -> Result<Json<ClusterView>, ApiError> {
-    if request.ntp123.is_none() && request.manual_server.is_none() {
+    if request.ntp123.is_none() && request.manual_server.is_none() && request.auto_apply.is_none() {
         return Err(api_error(
             StatusCode::BAD_REQUEST,
-            "至少需要提供 ntp123 或 manual_server",
+            "至少需要提供 ntp123、manual_server 或 auto_apply",
         ));
     }
     let Some(cluster) = app.cluster_handle() else {
@@ -1364,10 +1366,19 @@ async fn update_cluster_settings(
         }
         next.manual_server = Some(enabled);
     }
+    if let Some(enabled) = request.auto_apply {
+        if let Err(err) = cluster.set_auto_apply(enabled) {
+            return Err(api_error(StatusCode::CONFLICT, err));
+        }
+        next.auto_apply = Some(enabled);
+    }
     if let Some(enabled) = request.ntp123 {
         if let Err(err) = cluster.set_ntp123(enabled).await {
             if request.manual_server.is_some() {
                 let _ = cluster.set_manual_server(old_view.manual_server);
+            }
+            if request.auto_apply.is_some() {
+                let _ = cluster.set_auto_apply(old_view.auto_apply);
             }
             return Err(api_error(StatusCode::CONFLICT, err));
         }
@@ -1376,6 +1387,9 @@ async fn update_cluster_settings(
     if let Err(err) = app.save_settings(&next) {
         if request.manual_server.is_some() {
             let _ = cluster.set_manual_server(old_view.manual_server);
+        }
+        if request.auto_apply.is_some() {
+            let _ = cluster.set_auto_apply(old_view.auto_apply);
         }
         if request.ntp123.is_some() {
             let _ = cluster.set_ntp123(old_view.ntp123).await;
@@ -1390,8 +1404,9 @@ async fn update_cluster_settings(
         "system",
         None,
         format!(
-            "WebUI 集群设置已更新 · manual_server={} · ntp123={}",
+            "WebUI 集群设置已更新 · manual_server={} · auto_apply={} · ntp123={}",
             cluster.view().manual_server,
+            cluster.view().auto_apply,
             cluster.view().ntp123
         ),
     );

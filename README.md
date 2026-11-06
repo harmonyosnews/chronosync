@@ -4,9 +4,9 @@
 
 WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目录；发布包中的 `chronosync` / `chronosync.exe` 是单文件程序。
 
-最新发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.4.0>
+最新发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.5.0>
 
-`1.4.0` 在 1.3.0 基础上增加 WebUI 集群控制、NTPv4 热开关、手动 Server 指定、程序重启和“偏差”列。
+`1.5.0` 在 1.4.0 基础上增加 WebUI“自动写入本机时间”开关，复用偏差阈值和大步长保护；默认仍关闭。
 
 `1.3.0` 起提供可选标准 NTPv4 UDP 123 服务、Server/Client 集群与 Linux 静态构建：生产默认手动 server，`auto` 需显式开启；`auto_apply` 默认关闭。设计与限制见 [集群模式详细设计与排期](docs/集群模式详细设计与排期.md)。
 
@@ -49,7 +49,7 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 - **可选记住密码**：默认密码只在内存中；勾选“记住 SSH 密码”后，密码以明文保存在当前浏览器 localStorage，刷新/重启浏览器后可恢复。仅建议在个人受信任电脑使用，清除设备会同时删除已保存密码。
 - **Server/Client 集群（1.3.0）**：支持手动 server、client 和显式 auto 选举；client 通过带 HMAC 的 UDP 时间协议取样并按策略校时。`auto_apply` 默认关闭，生产建议手动 server，auto 仅用于可信局域网。
 - **标准 NTPv4（1.3.0）**：server 可显式开启 UDP 123，向标准 NTP 客户端提供时间；默认关闭，需要 root/管理员，未验证时不提供同步时间。
-- **WebUI 集群控制（1.4.0）**：在页面内热启停 NTPv4、手动指定/取消本机 Server、重启程序；NTPv4 与手动 Server 选择持久化到日志目录的 `runtime.json`（0600）。
+- **WebUI 集群控制（1.4.0/1.5.0）**：页面内热启停 NTPv4、手动指定/取消本机 Server、重启程序；1.5.0 增加“自动写入本机时间”开关，复用阈值/大步长保护，设置持久化到 `runtime.json`（0600）。
 
 ## 工作原理
 
@@ -78,8 +78,8 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 预编译包内包含 `install.sh`。解压后执行：
 
 ```bash
-tar -xzf chronosync-1.4.0-linux-x86_64-v1-static-20261106-150000.tar.gz
-cd chronosync-1.4.0-linux-x86_64-v1-static-20261106-150000
+tar -xzf chronosync-1.5.0-linux-x86_64-v1-static-20261106-170000.tar.gz
+cd chronosync-1.5.0-linux-x86_64-v1-static-20261106-170000
 
 # 默认监听 0.0.0.0:8686（局域网可访问），并启用访问认证
 sudo ./install.sh --bind 0.0.0.0 --auth admin:'换成强密码'
@@ -132,7 +132,7 @@ cargo build --release
 
 生成的可执行文件：`target/release/chronosync`。
 
-如果你拿到的是预编译包（例如 `chronosync-1.4.0-linux-x86_64-v1-static-20261106-150000.tar.gz`），解压后可直接使用其中的 `chronosync`。Linux 静态包使用 musl 静态链接，不依赖目标 glibc；可在 Debian 11/13、Buildroot 等环境运行。Windows 包不依赖 glibc。
+如果你拿到的是预编译包（例如 `chronosync-1.5.0-linux-x86_64-v1-static-20261106-170000.tar.gz`），解压后可直接使用其中的 `chronosync`。Linux 静态包使用 musl 静态链接，不依赖目标 glibc；可在 Debian 11/13、Buildroot 等环境运行。Windows 包不依赖 glibc。
 
 ### 2. 启动 Web 控制台
 
@@ -232,6 +232,7 @@ HTTP Basic 认证只是访问控制，**不是加密**。不要把控制台直�
 | --- | --- |
 | NTPv4 服务 | 在不重启进程的情况下绑定/释放 UDP 端口；默认关闭，失败时保留错误并继续运行私有集群时间服务。 |
 | 手动指定本机为 Server | 立即提升本机 term 并成为 Server；旧 Server 按仲裁降级。关闭后按启动模式回退（auto 重新发现，固定 server 变 client）。 |
+| 自动写入本机时间 | 1.5.0 新增，仅 client 生效；复用 `max_offset_ms`/`max_step_ms`，超大步长默认拒绝。开启前确认。 |
 | 重启程序 | 前台/服务进程原地 `exec` 重启，保持 PID 和 systemd/OpenRC 关系；校时或扫描中拒绝。 |
 
 两个开关会写入日志目录下的 `runtime.json`，下次启动继续生效。删除该文件即可回到安装参数。WebUI 重启当前仅支持 Linux/Unix；Windows 请使用启动/停止脚本或服务管理器。
@@ -250,7 +251,7 @@ ChronoSync 不信任本机时钟作为默认时间源。启动和每次校时都
 
 ## 多平台与 CPU 变体
 
-1.4.0 提供以下发布包（文件名统一包含版本、系统、CPU 体系、CPU 变体和时间戳）：
+1.5.0 提供以下发布包（文件名统一包含版本、系统、CPU 体系、CPU 变体和时间戳）：
 
 | 包标识 | 目标 | CPU 变体 | 适用 |
 | --- | --- | --- | --- |
@@ -264,9 +265,9 @@ ChronoSync 不信任本机时钟作为默认时间源。启动和每次校时都
 命名示例：
 
 ```text
-chronosync-1.4.0-linux-x86_64-v1-static-20261106-150000.tar.gz
-chronosync-1.4.0-linux-arm64-armv8a-static-20261106-150000.tar.gz
-chronosync-1.4.0-windows-x86_64-generic-20261106-150000.zip
+chronosync-1.5.0-linux-x86_64-v1-static-20261106-170000.tar.gz
+chronosync-1.5.0-linux-arm64-armv8a-static-20261106-170000.tar.gz
+chronosync-1.5.0-windows-x86_64-generic-20261106-170000.zip
 ```
 
 Linux 包内包含 `install.sh`；Windows 包内是单文件 `chronosync.exe`，可直接运行。WebUI 已嵌入程序，不需要额外的 web 资源文件。
@@ -284,7 +285,7 @@ Windows 说明：
 
 Linux x86 变体使用 `RUSTFLAGS=-C target-cpu=...` 构建：v1 使用 baseline `x86-64`，v2/v3/v4 分别使用 `x86-64-v2`/`v3`/`v4`；如果在不支持所选变体的旧 CPU 上运行，可能触发非法指令。普通使用请选 v1 或 v2。
 
-Linux 包为 **musl 静态链接**（1.4.0 保持），不依赖目标 glibc；x86_64 v1–v4 在 Debian 11 容器构建，ARM64 在 ARM 主机原生构建。Windows 包不依赖 glibc。
+Linux 包为 **musl 静态链接**（1.5.0 保持），不依赖目标 glibc；x86_64 v1–v4 在 Debian 11 容器构建，ARM64 在 ARM 主机原生构建。Windows 包不依赖 glibc。
 
 ## 兼容性
 

@@ -207,7 +207,7 @@ async fn main() {
             ntp123: runtime_settings.ntp123.unwrap_or(cli.cluster_ntp123),
             ntp123_port: cli.cluster_ntp123_port,
             server_eligible: cli.server_eligible,
-            auto_apply: cli.auto_apply,
+            auto_apply: runtime_settings.auto_apply.unwrap_or(cli.auto_apply),
             max_offset_ms: cli.max_offset_ms,
             max_step_ms: cli.max_step_ms,
             allow_large_step: cli.allow_large_step,
