@@ -4,13 +4,14 @@
 # AudioSys/Buildroot's /audiosys + CONFIG networkfs.sh hook model.
 set -u
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 PREFIX="/opt/chronosync"
 AUDIO_BASE="/audiosys/chronosync"
 SELF_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 SELF_PATH="$SELF_DIR/$(basename "$0")"
 
 ACTION="install"
+# Default: LAN-reachable. Use --bind 127.0.0.1 for loopback-only installs.
 BIND_HOST="0.0.0.0"
 PORT="8686"
 AUTH=""

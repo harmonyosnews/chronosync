@@ -38,6 +38,8 @@ impl Mode {
 #[derive(Clone, Debug)]
 pub struct Config {
     pub mode: Mode,
+    /// WebUI/运行设置显式把本机固定为 server。false 时 mode=server 会降为 client。
+    pub manual_server: bool,
     pub cluster_id: String,
     pub node_id: String,
     pub secret: Vec<u8>,
@@ -197,6 +199,7 @@ mod tests {
     fn cluster_validation_rejects_bad_ports_and_short_secret() {
         let mut config = Config {
             mode: Mode::Auto,
+            manual_server: false,
             cluster_id: "lab-1".to_string(),
             node_id: "node-00000001".to_string(),
             secret: b"0123456789abcdef".to_vec(),

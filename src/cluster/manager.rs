@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::Serialize;
 use tokio::net::UdpSocket;
+use tokio::sync::{Mutex as AsyncMutex, oneshot};
 use tokio::time::{self, timeout};
 
 use crate::cluster::config::{Config, Mode};
@@ -42,6 +43,34 @@ impl Role {
             Self::Server => "server",
             Self::Discovering => "discovering",
         }
+    }
+}
+
+fn effective_mode(mode: Mode, manual_server: bool) -> Mode {
+    if manual_server {
+        Mode::Server
+    } else if mode == Mode::Server {
+        Mode::Client
+    } else {
+        mode
+    }
+}
+
+fn initial_role(cfg: &Config) -> Role {
+    if cfg.manual_server {
+        Role::Server
+    } else {
+        match cfg.mode {
+            Mode::Auto => Role::Discovering,
+            Mode::Server | Mode::Client | Mode::Off => Role::Client,
+        }
+    }
+}
+
+fn fallback_role(mode: Mode) -> Role {
+    match mode {
+        Mode::Auto => Role::Discovering,
+        Mode::Server | Mode::Client | Mode::Off => Role::Client,
     }
 }
 
@@ -82,6 +111,8 @@ pub struct ClusterView {
     pub ntp_verified: bool,
     pub ntp123: bool,
     pub ntp123_port: u16,
+    pub ntp123_error: Option<String>,
+    pub manual_server: bool,
     pub auto_apply: bool,
     pub last_sync: Option<SyncView>,
     pub last_error: Option<String>,
@@ -102,7 +133,7 @@ struct Inner {
     last_error: Option<String>,
     last_heartbeat: Option<Instant>,
     last_hello: Option<Instant>,
-    pending_resign: bool,
+    resign_target: Option<Role>,
     packet_errors: u64,
 }
 
@@ -113,10 +144,17 @@ pub struct Cluster {
     sink: Arc<dyn EventSink>,
     seq: AtomicU64,
     seeds: Vec<SocketAddr>,
+    manual_server: AtomicBool,
+    ntp123_active: AtomicBool,
+    ntp123_error: Mutex<Option<String>>,
+    ntp123_op: AsyncMutex<()>,
+    ntp123_stop: Mutex<Option<oneshot::Sender<()>>>,
+    ntp123_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl Cluster {
     pub fn view(&self) -> ClusterView {
+        let manual_server = self.manual_server.load(Ordering::SeqCst);
         let state = lock(&self.inner);
         let server_id = match state.role {
             Role::Server => Some(self.cfg.node_id.clone()),
@@ -129,7 +167,9 @@ impl Cluster {
         };
         ClusterView {
             enabled: true,
-            mode: self.cfg.mode.as_str().to_string(),
+            mode: effective_mode(self.cfg.mode, manual_server)
+                .as_str()
+                .to_string(),
             role: state.role.as_str().to_string(),
             term: state.term,
             node_id: self.cfg.node_id.clone(),
@@ -138,8 +178,10 @@ impl Cluster {
             peers: state.peers.len(),
             ntp_verified: self.time_source.verified()
                 && self.time_source.age_ms() <= REFERENCE_MAX_AGE_MS,
-            ntp123: self.cfg.ntp123,
+            ntp123: self.ntp123_active.load(Ordering::SeqCst),
             ntp123_port: self.cfg.ntp123_port,
+            ntp123_error: lock(&self.ntp123_error).clone(),
+            manual_server,
             auto_apply: self.cfg.auto_apply,
             last_sync: state.last_sync.clone(),
             last_error: state.last_error.clone(),
@@ -158,8 +200,132 @@ impl Cluster {
         &self.sink
     }
 
+    /// Pin this node as the cluster server, or release the pin and fall back to
+    /// the configured startup mode (auto nodes resume discovery, fixed servers
+    /// become clients). The caller decides whether a confirmation is required.
+    pub fn set_manual_server(&self, enabled: bool) -> Result<(), String> {
+        let previous = self.manual_server.swap(enabled, Ordering::SeqCst);
+        if previous == enabled {
+            return Ok(());
+        }
+        let now = Instant::now();
+        let mut state = lock(&self.inner);
+        if enabled {
+            if state.role != Role::Server {
+                let observed_term = state.server.as_ref().map(|peer| peer.term).unwrap_or(0);
+                state.term = state.term.max(observed_term).saturating_add(1);
+                state.role = Role::Server;
+                state.server = None;
+                state.last_server_seen = None;
+                state.candidate_deadline = None;
+                state.collect_until = None;
+                state.claim_sent = false;
+                state.claims.clear();
+                state.last_heartbeat = None;
+                state.last_error = None;
+                state.resign_target = None;
+                let term = state.term;
+                drop(state);
+                self.sink
+                    .log("warn", format!("WebUI 手动指定本机为 server · term {term}"));
+            } else {
+                drop(state);
+                self.sink
+                    .log("system", "WebUI 手动 server 已启用".to_string());
+            }
+        } else {
+            let was_server = state.role == Role::Server;
+            let target = fallback_role(self.cfg.mode);
+            state.role = target;
+            state.server = None;
+            state.last_server_seen = None;
+            state.candidate_deadline = None;
+            state.collect_until = None;
+            state.claim_sent = false;
+            state.claims.clear();
+            state.last_error = None;
+            if target == Role::Discovering {
+                state.discovery_start = now;
+            }
+            if was_server {
+                state.resign_target = Some(target);
+            }
+            drop(state);
+            self.sink.log(
+                "warn",
+                "WebUI 已取消手动 server，本机按启动模式降级".to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    /// Start or stop the standard NTPv4 listener without restarting the process.
+    /// The listener owns its UDP socket; stopping it drops the socket after the
+    /// task acknowledges shutdown, so an immediate re-enable can bind again.
+    pub async fn set_ntp123(self: &Arc<Self>, enabled: bool) -> Result<(), String> {
+        let _guard = self.ntp123_op.lock().await;
+        if enabled {
+            if self.ntp123_active.load(Ordering::SeqCst) {
+                return Ok(());
+            }
+            let socket =
+                match UdpSocket::bind(SocketAddr::new(self.cfg.listen_ip, self.cfg.ntp123_port))
+                    .await
+                {
+                    Ok(socket) => socket,
+                    Err(err) => {
+                        let message = format!(
+                            "标准 NTPv4 服务无法绑定 UDP {}：{err}",
+                            self.cfg.ntp123_port
+                        );
+                        *lock(&self.ntp123_error) = Some(message.clone());
+                        self.sink
+                            .log("warn", format!("{message}；自定义集群时间服务继续运行"));
+                        return Err(message);
+                    }
+                };
+            let (stop_tx, stop_rx) = oneshot::channel();
+            let handle = tokio::spawn(super::ntp123::run(self.clone(), socket, stop_rx));
+            *lock(&self.ntp123_stop) = Some(stop_tx);
+            *lock(&self.ntp123_task) = Some(handle);
+            *lock(&self.ntp123_error) = None;
+            self.ntp123_active.store(true, Ordering::SeqCst);
+            self.sink.log(
+                "system",
+                format!("标准 NTPv4 服务已启动 · UDP {}/udp", self.cfg.ntp123_port),
+            );
+        } else {
+            if !self.ntp123_active.swap(false, Ordering::SeqCst) {
+                *lock(&self.ntp123_error) = None;
+                return Ok(());
+            }
+            if let Some(stop) = lock(&self.ntp123_stop).take() {
+                let _ = stop.send(());
+            }
+            let task = lock(&self.ntp123_task).take();
+            if let Some(mut handle) = task
+                && timeout(Duration::from_secs(2), &mut handle).await.is_err()
+            {
+                handle.abort();
+            }
+            *lock(&self.ntp123_error) = None;
+            self.sink
+                .log("system", "标准 NTPv4 服务已通过 WebUI 关闭".to_string());
+        }
+        Ok(())
+    }
+
     pub(crate) fn is_server(&self) -> bool {
         lock(&self.inner).role == Role::Server
+    }
+
+    pub(crate) fn is_client_for(&self, server_id: &str) -> bool {
+        let state = lock(&self.inner);
+        state.role == Role::Client
+            && state
+                .server
+                .as_ref()
+                .is_some_and(|peer| peer.node_id == server_id)
     }
 
     pub(crate) fn term(&self) -> u64 {
@@ -234,7 +400,7 @@ impl Cluster {
                         state.role = Role::Client;
                         state.server = Some(peer);
                         state.last_server_seen = Some(now);
-                        state.pending_resign = true;
+                        state.resign_target = Some(Role::Client);
                         drop(state);
                         self.sink.log(
                             "warn",
@@ -305,9 +471,8 @@ impl Cluster {
                 .peers
                 .retain(|_, peer| now.duration_since(peer.last_seen) < PEER_STALE);
 
-            if state.pending_resign {
-                state.pending_resign = false;
-                state.role = Role::Client;
+            if let Some(target) = state.resign_target.take() {
+                state.role = target;
                 send = Some(KIND_RESIGN);
             }
 
@@ -440,7 +605,19 @@ impl Cluster {
                         .last_server_seen
                         .map(|last| now.duration_since(last) >= SERVER_TIMEOUT)
                         .unwrap_or(true);
-                    if expired && self.cfg.mode == Mode::Auto {
+                    if expired && self.manual_server.load(Ordering::SeqCst) {
+                        // A manually pinned server that lost arbitration stays a
+                        // client while the winner is healthy. When the winner
+                        // resigns or disappears, the pin takes over again so a
+                        // fixed-server cluster cannot be left without a server.
+                        state.term = state.term.saturating_add(1);
+                        state.role = Role::Server;
+                        state.server = None;
+                        state.last_server_seen = None;
+                        state.last_heartbeat = None;
+                        state.last_error = None;
+                        events.push(("warn", "原 server 已失联，手动 Server 重新接管".to_string()));
+                    } else if expired && self.cfg.mode == Mode::Auto {
                         state.role = Role::Discovering;
                         state.discovery_start = now;
                         state.server = None;
@@ -550,15 +727,12 @@ pub async fn start(
 
     let seeds = resolve_seeds(&cfg).await?;
     let now = Instant::now();
-    let role = match cfg.mode {
-        Mode::Server => Role::Server,
-        Mode::Auto => Role::Discovering,
-        _ => Role::Client,
-    };
+    let role = initial_role(&cfg);
+    let manual_server = cfg.manual_server;
     let cluster = Arc::new(Cluster {
         inner: Arc::new(Mutex::new(Inner {
             role,
-            term: if cfg.mode == Mode::Server { 1 } else { 0 },
+            term: if role == Role::Server { 1 } else { 0 },
             server: None,
             peers: HashMap::new(),
             discovery_start: now,
@@ -571,7 +745,7 @@ pub async fn start(
             last_error: None,
             last_heartbeat: None,
             last_hello: None,
-            pending_resign: false,
+            resign_target: None,
             packet_errors: 0,
         })),
         cfg: Arc::new(cfg),
@@ -579,6 +753,12 @@ pub async fn start(
         sink,
         seq: AtomicU64::new(0),
         seeds,
+        manual_server: AtomicBool::new(manual_server),
+        ntp123_active: AtomicBool::new(false),
+        ntp123_error: Mutex::new(None),
+        ntp123_op: AsyncMutex::new(()),
+        ntp123_stop: Mutex::new(None),
+        ntp123_task: Mutex::new(None),
     });
 
     cluster.sink.log(
@@ -598,30 +778,7 @@ pub async fn start(
     tokio::spawn(manager_loop(cluster.clone(), discovery));
     tokio::spawn(super::time_service::run(cluster.clone(), time_socket));
     if cluster.cfg.ntp123 {
-        match UdpSocket::bind(SocketAddr::new(
-            cluster.cfg.listen_ip,
-            cluster.cfg.ntp123_port,
-        ))
-        .await
-        {
-            Ok(socket) => {
-                cluster.sink.log(
-                    "system",
-                    format!(
-                        "标准 NTPv4 服务已启动 · UDP {}/123",
-                        cluster.cfg.ntp123_port
-                    ),
-                );
-                tokio::spawn(super::ntp123::run(cluster.clone(), socket));
-            }
-            Err(err) => cluster.sink.log(
-                "warn",
-                format!(
-                    "标准 NTPv4 服务无法绑定 UDP {}：{err}；自定义集群时间服务继续运行",
-                    cluster.cfg.ntp123_port
-                ),
-            ),
-        }
+        let _ = cluster.clone().set_ntp123(true).await;
     }
     tokio::spawn(client_loop(cluster.clone()));
     Ok(cluster)
@@ -679,7 +836,9 @@ async fn client_loop(cluster: Arc<Cluster>) {
         };
         next_attempt = Instant::now() + cluster.cfg.sync_interval;
         let result = sync_once(&cluster, &server_id, server_addr).await;
-        if let Err(err) = result {
+        if let Err(err) = result
+            && cluster.is_client_for(&server_id)
+        {
             cluster.set_last_error(Some(err.clone()));
             cluster.sink.log("warn", format!("集群校时失败：{err}"));
         }
@@ -743,6 +902,11 @@ async fn sync_once(
     }
     if samples.is_empty() {
         return Err("没有收到有效时间样本".to_string());
+    }
+    // The node may have been promoted to server while the samples were in
+    // flight. Only apply or report a result if we still follow this server.
+    if !cluster.is_client_for(server_id) {
+        return Ok(());
     }
     let mut offsets: Vec<i64> = samples.iter().map(|(offset, _)| *offset).collect();
     offsets.sort_unstable();
@@ -883,5 +1047,26 @@ mod tests {
             .min_by(|a, b| a.node_id.cmp(&b.node_id))
             .unwrap();
         assert_eq!(winner.node_id, "node-a");
+    }
+}
+
+#[cfg(test)]
+mod runtime_mode_tests {
+    use super::*;
+
+    #[test]
+    fn manual_server_overrides_configured_mode() {
+        assert_eq!(effective_mode(Mode::Client, true), Mode::Server);
+        assert_eq!(effective_mode(Mode::Auto, true), Mode::Server);
+        assert_eq!(effective_mode(Mode::Server, true), Mode::Server);
+    }
+
+    #[test]
+    fn released_manual_server_falls_back_safely() {
+        assert_eq!(effective_mode(Mode::Server, false), Mode::Client);
+        assert_eq!(effective_mode(Mode::Auto, false), Mode::Auto);
+        assert_eq!(fallback_role(Mode::Server), Role::Client);
+        assert_eq!(fallback_role(Mode::Auto), Role::Discovering);
+        assert_eq!(fallback_role(Mode::Client), Role::Client);
     }
 }

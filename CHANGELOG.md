@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.0 - 2026-11-06
+
+### Added
+
+- WebUI 集群控制条：NTPv4 服务热启停、手动指定本机为 Server、程序重启。
+- `POST /api/cluster/settings`：运行时切换 NTPv4 与手动 Server，并保存到日志目录下的 `runtime.json`（0600）。
+- `POST /api/system/restart`：Linux/Unix 通过原地 `exec` 重启，保持 PID 和服务管理关系；校时/扫描中拒绝重启。
+- 重启兼容原子升级后的 `(deleted)` 可执行文件路径，会执行同路径的新二进制。
+- 手动 Server 使用已观察 term 递增接管，旧 Server 按仲裁降级；取消后按启动模式回退。
+- 设备清单新增“偏差”列：检测显示当前偏差，校时成功后显示带符号的残余偏差（`after_drift_ms`）。
+- `/api/health` 增加 `instance_id`，重启后前端据此确认新实例。
+
+### Changed
+
+- 安装文档把 `--bind 0.0.0.0` 写为默认安装示例；安装器默认值保持 `0.0.0.0:8686`。
+- 版本提升到 1.4.0。
+
+### Security / Limits
+
+- `runtime.json` 位于受保护的日志目录，权限 0600；修改接口受现有 HTTP Basic 认证约束。
+- WebUI 重启当前仅支持 Unix；Windows 返回 501，需使用启动/停止脚本或服务管理器。
+- 标准 NTPv4 仍无 HMAC，默认关闭；只应在可信内网开放。
+
 ## 1.3.0 - 2026-11-06
 
 ### Added

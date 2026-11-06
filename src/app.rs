@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axum::extract::{DefaultBodyLimit, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -19,6 +19,7 @@ use crate::local::{self, LocalEnvironment};
 use crate::ntp::{self, TimeReference};
 use crate::remote::{self, OptionalStep, RemoteTarget, SshClient, SyncOptions};
 use crate::scan::{self, ScanResult};
+use crate::settings::Settings;
 
 const BUILD_TARGET: &str = env!("CHRONOSYNC_BUILD_TARGET");
 const BUILD_VARIANT: &str = env!("CHRONOSYNC_BUILD_VARIANT");
@@ -35,6 +36,7 @@ pub struct Config {
     pub allow_system_clock: bool,
     pub log_dir: PathBuf,
     pub auth_header: Option<String>,
+    pub settings_path: PathBuf,
 }
 
 pub struct App {
@@ -42,6 +44,8 @@ pub struct App {
     cfg: Arc<Config>,
     local: LocalEnvironment,
     cluster: Mutex<Option<Arc<cluster::Cluster>>>,
+    settings: Mutex<Settings>,
+    instance_id: String,
 }
 
 struct Inner {
@@ -54,6 +58,7 @@ struct Inner {
     scanning: AtomicBool,
     activity: Arc<tokio::sync::Mutex<()>>,
     run_seq: AtomicU64,
+    restarting: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -79,6 +84,7 @@ pub struct MachineState {
     pub timezone: Option<String>,
     pub remote_local: Option<String>,
     pub before_drift_ms: Option<i64>,
+    pub after_drift_ms: Option<i64>,
     pub after_local: Option<String>,
     pub elapsed_ms: Option<u64>,
     pub hwclock: Option<String>,
@@ -123,6 +129,7 @@ pub struct StateResponse {
     pub running: bool,
     pub scanning: bool,
     pub sync_ready: bool,
+    pub restart_supported: bool,
     pub run: Option<RunView>,
     pub cluster: Option<ClusterView>,
     pub machines: Vec<MachineState>,
@@ -254,7 +261,7 @@ impl Drop for ScanGuard {
 }
 
 impl App {
-    pub async fn new(cfg: Config, local: LocalEnvironment) -> Arc<Self> {
+    pub async fn new(cfg: Config, local: LocalEnvironment, settings: Settings) -> Arc<Self> {
         if let Err(err) = std::fs::create_dir_all(&cfg.log_dir) {
             eprintln!("警告：无法创建日志目录 {}：{err}", cfg.log_dir.display());
         }
@@ -269,10 +276,13 @@ impl App {
                 scanning: AtomicBool::new(false),
                 activity: Arc::new(tokio::sync::Mutex::new(())),
                 run_seq: AtomicU64::new(0),
+                restarting: AtomicBool::new(false),
             }),
             cfg: Arc::new(cfg),
             local,
             cluster: Mutex::new(None),
+            settings: Mutex::new(settings),
+            instance_id: instance_id(),
         });
 
         match ntp::probe(&app.cfg.ntp_servers).await {
@@ -334,6 +344,8 @@ impl App {
             .route("/api/logs/download", get(download_logs))
             .route("/api/health", get(health))
             .route("/api/cluster/state", get(cluster_state))
+            .route("/api/cluster/settings", post(update_cluster_settings))
+            .route("/api/system/restart", post(restart_service))
             .layer(DefaultBodyLimit::max(512 * 1024))
             .layer(middleware::from_fn(security_headers))
             .with_state(self.clone());
@@ -362,6 +374,14 @@ impl App {
 
     pub fn cluster_view(&self) -> Option<ClusterView> {
         lock(&self.cluster).as_ref().map(|cluster| cluster.view())
+    }
+
+    fn cluster_handle(&self) -> Option<Arc<cluster::Cluster>> {
+        lock(&self.cluster).clone()
+    }
+
+    fn save_settings(&self, settings: &Settings) -> Result<(), String> {
+        settings.save(&self.cfg.settings_path)
     }
 
     pub fn console_summary(&self, address: &str) -> String {
@@ -554,6 +574,7 @@ impl App {
                     timezone: None,
                     remote_local: None,
                     before_drift_ms: None,
+                    after_drift_ms: None,
                     after_local: None,
                     elapsed_ms: None,
                     hwclock: None,
@@ -887,6 +908,7 @@ impl App {
                 self.update_machine(&target.id, |machine| {
                     machine.status = "error".to_string();
                     machine.message = message.clone();
+                    machine.after_drift_ms = Some(residual);
                     machine.after_local = Some(after_local.clone());
                     machine.elapsed_ms = Some(elapsed_ms);
                     machine.hwclock = Some(hwclock_action.clone());
@@ -927,6 +949,7 @@ impl App {
                 drift_description(drift_ms),
                 warning_suffix
             );
+            machine.after_drift_ms = residual_ms;
             machine.after_local = Some(after_local.clone());
             machine.elapsed_ms = Some(elapsed_ms);
             machine.hwclock = Some(hwclock_action.clone());
@@ -1260,6 +1283,7 @@ impl App {
             running: self.inner.running.load(Ordering::SeqCst),
             scanning: self.inner.scanning.load(Ordering::SeqCst),
             sync_ready: self.sync_ready(),
+            restart_supported: cfg!(unix),
             run: lock(&self.inner.run).clone(),
             cluster: self.cluster_view(),
             machines,
@@ -1292,9 +1316,133 @@ async fn cluster_state(State(app): State<Arc<App>>) -> Json<Option<ClusterView>>
     Json(app.cluster_view())
 }
 
+#[derive(Deserialize)]
+pub struct ClusterSettingsRequest {
+    #[serde(default)]
+    pub ntp123: Option<bool>,
+    #[serde(default)]
+    pub manual_server: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub struct RestartResponse {
+    pub ok: bool,
+    pub message: String,
+}
+
+async fn update_cluster_settings(
+    State(app): State<Arc<App>>,
+    Json(request): Json<ClusterSettingsRequest>,
+) -> Result<Json<ClusterView>, ApiError> {
+    if request.ntp123.is_none() && request.manual_server.is_none() {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "至少需要提供 ntp123 或 manual_server",
+        ));
+    }
+    let Some(cluster) = app.cluster_handle() else {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "集群模式未启用，无法修改集群设置",
+        ));
+    };
+    if request.manual_server.is_some()
+        && (app.inner.running.load(Ordering::SeqCst) || app.inner.scanning.load(Ordering::SeqCst))
+    {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "校时或扫描任务执行中，不能切换 Server 角色",
+        ));
+    }
+
+    let old_settings = lock(&app.settings).clone();
+    let old_view = cluster.view();
+    let mut next = old_settings.clone();
+    if let Some(enabled) = request.manual_server {
+        if let Err(err) = cluster.set_manual_server(enabled) {
+            return Err(api_error(StatusCode::CONFLICT, err));
+        }
+        next.manual_server = Some(enabled);
+    }
+    if let Some(enabled) = request.ntp123 {
+        if let Err(err) = cluster.set_ntp123(enabled).await {
+            if request.manual_server.is_some() {
+                let _ = cluster.set_manual_server(old_view.manual_server);
+            }
+            return Err(api_error(StatusCode::CONFLICT, err));
+        }
+        next.ntp123 = Some(enabled);
+    }
+    if let Err(err) = app.save_settings(&next) {
+        if request.manual_server.is_some() {
+            let _ = cluster.set_manual_server(old_view.manual_server);
+        }
+        if request.ntp123.is_some() {
+            let _ = cluster.set_ntp123(old_view.ntp123).await;
+        }
+        return Err(api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("保存运行设置失败：{err}"),
+        ));
+    }
+    *lock(&app.settings) = next;
+    app.log(
+        "system",
+        None,
+        format!(
+            "WebUI 集群设置已更新 · manual_server={} · ntp123={}",
+            cluster.view().manual_server,
+            cluster.view().ntp123
+        ),
+    );
+    Ok(Json(cluster.view()))
+}
+
+async fn restart_service(
+    State(app): State<Arc<App>>,
+) -> Result<(StatusCode, Json<RestartResponse>), ApiError> {
+    if !cfg!(unix) {
+        return Err(api_error(
+            StatusCode::NOT_IMPLEMENTED,
+            "当前平台不支持 WebUI 内重启，请使用 start/stop 脚本或服务管理器",
+        ));
+    }
+    if app.inner.running.load(Ordering::SeqCst) || app.inner.scanning.load(Ordering::SeqCst) {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "校时或扫描任务执行中，不能重启程序",
+        ));
+    }
+    if app
+        .inner
+        .restarting
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(api_error(StatusCode::CONFLICT, "重启已在进行中"));
+    }
+    app.log("warn", None, "收到 WebUI 重启请求，服务即将重启");
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(450)).await;
+        if let Err(err) = restart_current_process() {
+            app_clone.inner.restarting.store(false, Ordering::SeqCst);
+            app_clone.log("error", None, format!("重启失败：{err}"));
+        }
+    });
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(RestartResponse {
+            ok: true,
+            message: "服务正在重启，页面将自动重新连接".to_string(),
+        }),
+    ))
+}
+
 async fn health(State(app): State<Arc<App>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "ok": true,
+        "instance_id": app.instance_id,
         "version": env!("CARGO_PKG_VERSION"),
         "build": {
             "target": BUILD_TARGET,
@@ -1882,6 +2030,45 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+fn instance_id() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!("{}-{nanos}", std::process::id())
+}
+
+#[cfg(unix)]
+fn restart_current_process() -> Result<(), String> {
+    use std::os::unix::process::CommandExt;
+
+    let exe = restart_executable_path(
+        std::env::current_exe().map_err(|err| format!("无法定位当前可执行文件：{err}"))?,
+    );
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let err = std::process::Command::new(&exe).args(args).exec();
+    Err(format!("执行 {} 失败：{err}", exe.display()))
+}
+
+#[cfg(unix)]
+fn restart_executable_path(raw: std::path::PathBuf) -> std::path::PathBuf {
+    // Linux /proc/self/exe reports " (deleted)" after an atomic binary upgrade.
+    // Exec the replacement at the same path so WebUI restart also works then.
+    #[cfg(target_os = "linux")]
+    {
+        let text = raw.to_string_lossy();
+        if let Some(path) = text.strip_suffix(" (deleted)") {
+            return std::path::PathBuf::from(path);
+        }
+    }
+    raw
+}
+
+#[cfg(not(unix))]
+fn restart_current_process() -> Result<(), String> {
+    Err("当前平台不支持 WebUI 内重启".to_string())
+}
+
 impl cluster::TimeSource for App {
     fn now_epoch_ms(&self) -> i64 {
         self.now_standard_ms()
@@ -1966,6 +2153,17 @@ mod tests {
     fn sanitize_strips_ansi_and_controls() {
         assert_eq!(sanitize_text("a\u{1b}[31mred\u{1b}[0m\nb", 100), "ared b");
         assert_eq!(sanitize_text("0123456789", 4), "0123…");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn restart_path_strips_deleted_suffix() {
+        let path = restart_executable_path(std::path::PathBuf::from(
+            "/opt/chronosync/chronosync (deleted)",
+        ));
+        assert_eq!(path, std::path::PathBuf::from("/opt/chronosync/chronosync"));
+        let normal = std::path::PathBuf::from("/opt/chronosync/chronosync");
+        assert_eq!(restart_executable_path(normal.clone()), normal);
     }
 
     #[test]

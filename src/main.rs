@@ -4,6 +4,7 @@ mod local;
 mod ntp;
 mod remote;
 mod scan;
+mod settings;
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -157,13 +158,19 @@ async fn main() {
 
     let auth_enabled = auth_header.is_some();
     let local_environment = local::environment();
+    let settings_path = cli.log_dir.join("runtime.json");
+    let (runtime_settings, settings_warning) = settings::Settings::load(&settings_path);
+    if let Some(warning) = settings_warning {
+        eprintln!("警告：{warning}");
+    }
     let config = app::Config {
         ntp_servers: cli.ntp_servers.clone(),
         allow_system_clock: cli.allow_system_clock,
         log_dir: cli.log_dir.clone(),
         auth_header,
+        settings_path: settings_path.clone(),
     };
-    let app = app::App::new(config, local_environment).await;
+    let app = app::App::new(config, local_environment, runtime_settings.clone()).await;
     let cluster_mode = cluster::Mode::parse(&cli.cluster_mode).unwrap_or_else(|| {
         eprintln!("错误：无效的 --cluster-mode {}", cli.cluster_mode);
         std::process::exit(2);
@@ -188,13 +195,16 @@ async fn main() {
         });
         let cluster_cfg = cluster::Config {
             mode: cluster_mode,
+            manual_server: runtime_settings
+                .manual_server
+                .unwrap_or(cluster_mode == cluster::Mode::Server),
             cluster_id: cli.cluster_id.clone(),
             node_id,
             secret,
             listen_ip,
             discovery_port: cli.discovery_port,
             time_port: cli.time_port,
-            ntp123: cli.cluster_ntp123,
+            ntp123: runtime_settings.ntp123.unwrap_or(cli.cluster_ntp123),
             ntp123_port: cli.cluster_ntp123_port,
             server_eligible: cli.server_eligible,
             auto_apply: cli.auto_apply,
