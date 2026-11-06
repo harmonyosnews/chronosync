@@ -4,9 +4,9 @@
 
 WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目录；发布包中的 `chronosync` / `chronosync.exe` 是单文件程序。
 
-发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.2.0>
+发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.3.0>
 
-`1.2.0` 起提供 Server/Client 集群模式与 Linux 静态构建：生产默认手动 server，`auto` 需显式开启；`auto_apply` 默认关闭。设计与限制见 [集群模式详细设计与排期](docs/集群模式详细设计与排期.md)。
+`1.3.0` 起提供可选标准 NTPv4 UDP 123 服务、Server/Client 集群与 Linux 静态构建：生产默认手动 server，`auto` 需显式开启；`auto_apply` 默认关闭。设计与限制见 [集群模式详细设计与排期](docs/集群模式详细设计与排期.md)。
 
 文档基线：2026-11-06。24 小时长稳测试已按项目决定取消，不列入本版验收或闸门。
 
@@ -44,7 +44,8 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 - **默认局域网访问**：默认监听 `0.0.0.0`，局域网内可直接打开 WebUI；可配合 `--auth` 或反向代理使用。NTP 全部不可达时默认拒绝校时，避免把所有机器写到一个错误的本机时间。
 - **清除设备**：设备清单工具栏提供“清除设备”；确认后移除所有行及浏览器已保存的 SSH 密码，不删除运行日志。
 - **可选记住密码**：默认密码只在内存中；勾选“记住 SSH 密码”后，密码以明文保存在当前浏览器 localStorage，刷新/重启浏览器后可恢复。仅建议在个人受信任电脑使用，清除设备会同时删除已保存密码。
-- **Server/Client 集群（1.2.0）**：支持手动 server、client 和显式 auto 选举；server 从外部 NTP 取时，client 通过带 HMAC 的 UDP 时间协议取样并按策略校时。`auto_apply` 默认关闭，生产建议手动 server，auto 仅用于可信局域网。
+- **Server/Client 集群（1.3.0）**：支持手动 server、client 和显式 auto 选举；client 通过带 HMAC 的 UDP 时间协议取样并按策略校时。`auto_apply` 默认关闭，生产建议手动 server，auto 仅用于可信局域网。
+- **标准 NTPv4（1.3.0）**：server 可显式开启 UDP 123，向标准 NTP 客户端提供时间；默认关闭，需要 root/管理员，未验证时不提供同步时间。
 
 ## 工作原理
 
@@ -73,8 +74,8 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 预编译包内包含 `install.sh`。解压后执行：
 
 ```bash
-tar -xzf chronosync-1.2.0-linux-x86_64-v1-static-20261106-133000.tar.gz
-cd chronosync-1.2.0-linux-x86_64-v1-static-20261106-133000
+tar -xzf chronosync-1.3.0-linux-x86_64-v1-static-20261106-140000.tar.gz
+cd chronosync-1.3.0-linux-x86_64-v1-static-20261106-140000
 
 # 推荐：默认监听 0.0.0.0:8686，并启用访问认证
 sudo ./install.sh --auth admin:'换成强密码'
@@ -127,7 +128,7 @@ cargo build --release
 
 生成的可执行文件：`target/release/chronosync`。
 
-如果你拿到的是预编译包（例如 `chronosync-1.2.0-linux-x86_64-v1-static-20261106-133000.tar.gz`），解压后可直接使用其中的 `chronosync`。Linux 静态包使用 musl 静态链接，不依赖目标 glibc；可在 Debian 11/13、Buildroot 等环境运行。Windows 包不依赖 glibc。
+如果你拿到的是预编译包（例如 `chronosync-1.3.0-linux-x86_64-v1-static-20261106-140000.tar.gz`），解压后可直接使用其中的 `chronosync`。Linux 静态包使用 musl 静态链接，不依赖目标 glibc；可在 Debian 11/13、Buildroot 等环境运行。Windows 包不依赖 glibc。
 
 ### 2. 启动 Web 控制台
 
@@ -231,7 +232,7 @@ ChronoSync 不信任本机时钟作为默认时间源。启动和每次校时都
 
 ## 多平台与 CPU 变体
 
-1.2.0 起提供以下发布包（文件名统一包含版本、系统、CPU 体系、CPU 变体和时间戳）：
+1.3.0 起提供以下发布包（文件名统一包含版本、系统、CPU 体系、CPU 变体和时间戳）：
 
 | 包标识 | 目标 | CPU 变体 | 适用 |
 | --- | --- | --- | --- |
@@ -245,9 +246,9 @@ ChronoSync 不信任本机时钟作为默认时间源。启动和每次校时都
 命名示例：
 
 ```text
-chronosync-1.2.0-linux-x86_64-v1-static-20261106-133000.tar.gz
-chronosync-1.2.0-linux-arm64-armv8a-static-20261106-133000.tar.gz
-chronosync-1.2.0-windows-x86_64-generic-20261106-133000.zip
+chronosync-1.3.0-linux-x86_64-v1-static-20261106-140000.tar.gz
+chronosync-1.3.0-linux-arm64-armv8a-static-20261106-140000.tar.gz
+chronosync-1.3.0-windows-x86_64-generic-20261106-140000.zip
 ```
 
 Linux 包内包含 `install.sh`；Windows 包内是单文件 `chronosync.exe`，可直接运行。WebUI 已嵌入程序，不需要额外的 web 资源文件。
@@ -265,7 +266,7 @@ Windows 说明：
 
 Linux x86 变体使用 `RUSTFLAGS=-C target-cpu=...` 构建：v1 使用 baseline `x86-64`，v2/v3/v4 分别使用 `x86-64-v2`/`v3`/`v4`；如果在不支持所选变体的旧 CPU 上运行，可能触发非法指令。普通使用请选 v1 或 v2。
 
-Linux 包自 1.2.0 起为 **musl 静态链接**，不依赖目标 glibc；x86_64 v1–v4 在 Debian 11 容器构建，ARM64 在 ARM 主机原生构建。Windows 包不依赖 glibc。
+Linux 包自 1.2.0 起为 **musl 静态链接**（1.3.0 保持），不依赖目标 glibc；x86_64 v1–v4 在 Debian 11 容器构建，ARM64 在 ARM 主机原生构建。Windows 包不依赖 glibc。
 
 ## 兼容性
 
@@ -292,7 +293,7 @@ Linux 包自 1.2.0 起为 **musl 静态链接**，不依赖目标 glibc；x86_64
 - 页面右侧是固定约 10 行的日志视窗，超出后滚动查看；不再让日志把整页撑满。
 - 后端保留本次进程内最近 8000 条日志，页面会持续增量刷新。
 - 每次任务结束后，日志自动保存到 `--log-dir`，文件名类似：
-  `chronosync-20261106-133000-run1.log`。安装脚本默认使用 `/var/log/chronosync`，AudioSys 使用 `/audiosys/chronosync/logs`。
+  `chronosync-20261106-140000-run1.log`。安装脚本默认使用 `/var/log/chronosync`，AudioSys 使用 `/audiosys/chronosync/logs`。
 - 页面“下载日志”按钮下载当前进程内的全部日志，包含标准时间源、主机名、偏差、警告和错误。
 - 日志中不会出现 SSH 密码。
 

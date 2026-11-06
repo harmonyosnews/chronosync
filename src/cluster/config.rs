@@ -44,6 +44,8 @@ pub struct Config {
     pub listen_ip: IpAddr,
     pub discovery_port: u16,
     pub time_port: u16,
+    pub ntp123: bool,
+    pub ntp123_port: u16,
     pub server_eligible: bool,
     pub auto_apply: bool,
     pub max_offset_ms: i64,
@@ -72,6 +74,9 @@ impl Config {
         }
         if self.discovery_port == 0 || self.time_port == 0 {
             return Err("集群端口不能为 0".to_string());
+        }
+        if self.ntp123 && self.ntp123_port == 0 {
+            return Err("NTP 123 端口不能为 0".to_string());
         }
         if self.discovery_port == self.time_port {
             return Err("发现端口和时间端口不能相同".to_string());
@@ -198,6 +203,8 @@ mod tests {
             listen_ip: std::net::Ipv4Addr::UNSPECIFIED.into(),
             discovery_port: 18686,
             time_port: 18687,
+            ntp123: false,
+            ntp123_port: 123,
             server_eligible: true,
             auto_apply: false,
             max_offset_ms: 100,

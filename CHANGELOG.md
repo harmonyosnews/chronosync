@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0 - 2026-11-06
+
+### Added
+
+- 可选标准 NTPv4 服务：`--cluster-ntp123`、`--cluster-ntp123-port`，默认关闭。
+- NTPv4 响应为 48 字节（LI/VN/mode/stratum/reference/origin/receive/transmit），仅 server 且参考有效时提供同步时间。
+- 安装器支持 `--cluster-ntp123` / `--cluster-ntp123-port`。
+- 可复现分区矩阵脚本 `scripts/cluster_matrix.py`：广播屏蔽/seed、双 server 脑裂、合并、server 失联重选。
+- 矩阵 4/4 PASS；标准 NTP 123 实测 LI=0/VN=4/mode=4/stratum=3，offset -13.3ms，RTT 0.3ms。
+- Linux 静态包与 Windows 包同步到 1.3.0。
+
+### Known Limitations
+
+- 标准 NTP 123 无 HMAC；默认关闭，只在可信内网/防火墙限制下开启。
+- 分区矩阵用端口隔离/本机进程模拟，不覆盖真实交换机/AP 广播过滤和跨网段路由。
+- 集群仍为单 L2；广播阻断时需 seed。
+
 ## 1.2.0 - 2026-11-06
 
 ### Added

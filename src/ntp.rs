@@ -273,7 +273,7 @@ fn parse_response(packet: &[u8], t1: f64, t4: f64) -> Result<(f64, f64), String>
     Ok((offset, rtt))
 }
 
-fn encode_ntp_timestamp(unix_secs: f64) -> [u8; 8] {
+pub(crate) fn encode_ntp_timestamp(unix_secs: f64) -> [u8; 8] {
     let ntp_secs = unix_secs + NTP_UNIX_DELTA;
     let secs = ntp_secs.floor().max(0.0) as u32;
     let fraction = ((ntp_secs - secs as f64) * 4_294_967_296.0).clamp(0.0, 4_294_967_295.0) as u32;

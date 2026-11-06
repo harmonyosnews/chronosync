@@ -1,5 +1,6 @@
 mod config;
 mod manager;
+mod ntp123;
 mod protocol;
 mod time_service;
 

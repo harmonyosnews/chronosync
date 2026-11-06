@@ -1,0 +1,17 @@
+ChronoSync v1.3.0 gates
+2026-11-06 / build 20261106-140000
+
+G1 fmt PASS
+G2 clippy PASS
+G3 tests PASS (32)
+G4 JS PASS
+G5 browser PASS (1.3.0 footer/cluster badge)
+G6 installer PASS (NTP123 dry-run; 11/11 deployed 1.3.0 packages, services restarted)
+G7 platform PASS (x86 v1-v4, ARM64, Windows)
+G8 standard NTP123 PASS (48-byte, LI0 VN4 mode4 stratum3, offset -13.3ms); 11/11 deployment same server_id, applied=false
+G9 partition matrix PASS (4/4; script scripts/cluster_matrix.py)
+G10 package PASS (7 archives, SHA256SUMS)
+G11 sensitive PASS
+G12 version PASS (1.3.0)
+G13 release PENDING
+G14 docs PASS (129 links, 0 missing)

@@ -88,6 +88,14 @@ struct Cli {
     #[arg(long, default_value_t = 18687)]
     time_port: u16,
 
+    /// 启用标准 NTPv4 服务（需要绑定 UDP 123，通常需要 root/管理员）
+    #[arg(long)]
+    cluster_ntp123: bool,
+
+    /// 标准 NTP 服务端口（默认 123；仅用于冲突排查/测试）
+    #[arg(long, default_value_t = 123)]
+    cluster_ntp123_port: u16,
+
     /// 是否允许本节点被选为 server
     #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
     server_eligible: bool,
@@ -186,6 +194,8 @@ async fn main() {
             listen_ip,
             discovery_port: cli.discovery_port,
             time_port: cli.time_port,
+            ntp123: cli.cluster_ntp123,
+            ntp123_port: cli.cluster_ntp123_port,
             server_eligible: cli.server_eligible,
             auto_apply: cli.auto_apply,
             max_offset_ms: cli.max_offset_ms,

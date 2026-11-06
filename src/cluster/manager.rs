@@ -80,6 +80,8 @@ pub struct ClusterView {
     pub server_addr: Option<String>,
     pub peers: usize,
     pub ntp_verified: bool,
+    pub ntp123: bool,
+    pub ntp123_port: u16,
     pub auto_apply: bool,
     pub last_sync: Option<SyncView>,
     pub last_error: Option<String>,
@@ -136,6 +138,8 @@ impl Cluster {
             peers: state.peers.len(),
             ntp_verified: self.time_source.verified()
                 && self.time_source.age_ms() <= REFERENCE_MAX_AGE_MS,
+            ntp123: self.cfg.ntp123,
+            ntp123_port: self.cfg.ntp123_port,
             auto_apply: self.cfg.auto_apply,
             last_sync: state.last_sync.clone(),
             last_error: state.last_error.clone(),
@@ -593,6 +597,32 @@ pub async fn start(
     tokio::spawn(receive_loop(cluster.clone(), discovery.clone()));
     tokio::spawn(manager_loop(cluster.clone(), discovery));
     tokio::spawn(super::time_service::run(cluster.clone(), time_socket));
+    if cluster.cfg.ntp123 {
+        match UdpSocket::bind(SocketAddr::new(
+            cluster.cfg.listen_ip,
+            cluster.cfg.ntp123_port,
+        ))
+        .await
+        {
+            Ok(socket) => {
+                cluster.sink.log(
+                    "system",
+                    format!(
+                        "标准 NTPv4 服务已启动 · UDP {}/123",
+                        cluster.cfg.ntp123_port
+                    ),
+                );
+                tokio::spawn(super::ntp123::run(cluster.clone(), socket));
+            }
+            Err(err) => cluster.sink.log(
+                "warn",
+                format!(
+                    "标准 NTPv4 服务无法绑定 UDP {}：{err}；自定义集群时间服务继续运行",
+                    cluster.cfg.ntp123_port
+                ),
+            ),
+        }
+    }
     tokio::spawn(client_loop(cluster.clone()));
     Ok(cluster)
 }

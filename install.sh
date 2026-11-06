@@ -4,7 +4,7 @@
 # AudioSys/Buildroot's /audiosys + CONFIG networkfs.sh hook model.
 set -u
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 PREFIX="/opt/chronosync"
 AUDIO_BASE="/audiosys/chronosync"
 SELF_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
@@ -25,6 +25,8 @@ CLUSTER_ID="chronosync"
 CLUSTER_BIND="0.0.0.0"
 CLUSTER_DISCOVERY_PORT="18686"
 CLUSTER_TIME_PORT="18687"
+CLUSTER_NTP123="0"
+CLUSTER_NTP123_PORT="123"
 CLUSTER_SECRET_FILE=""
 CLUSTER_SERVER_ELIGIBLE="true"
 CLUSTER_AUTO_APPLY="0"
@@ -60,6 +62,8 @@ ChronoSync v$VERSION 安装器
   --cluster-bind ADDR        集群 UDP 绑定地址（默认 0.0.0.0）
   --cluster-discovery-port N 发现端口（默认 18686）
   --cluster-time-port N      时间端口（默认 18687）
+  --cluster-ntp123           启用标准 NTPv4 UDP 123（需 root；默认关闭）
+  --cluster-ntp123-port N    标准 NTP 端口（默认 123）
   --cluster-secret-file PATH 管理员预置密钥；省略时安装器生成
   --cluster-server-eligible true|false  是否可被选为 server（默认 true）
   --cluster-auto-apply       client 自动写入本机时间（默认关闭）
@@ -93,6 +97,8 @@ while [ $# -gt 0 ]; do
         --cluster-bind) [ $# -ge 2 ] || die "--cluster-bind 缺少参数"; CLUSTER_BIND="$2"; shift 2 ;;
         --cluster-discovery-port) [ $# -ge 2 ] || die "--cluster-discovery-port 缺少参数"; CLUSTER_DISCOVERY_PORT="$2"; shift 2 ;;
         --cluster-time-port) [ $# -ge 2 ] || die "--cluster-time-port 缺少参数"; CLUSTER_TIME_PORT="$2"; shift 2 ;;
+        --cluster-ntp123) CLUSTER_NTP123=1; shift ;;
+        --cluster-ntp123-port) [ $# -ge 2 ] || die "--cluster-ntp123-port 缺少参数"; CLUSTER_NTP123_PORT="$2"; shift 2 ;;
         --cluster-secret-file) [ $# -ge 2 ] || die "--cluster-secret-file 缺少参数"; CLUSTER_SECRET_FILE="$2"; shift 2 ;;
         --cluster-server-eligible) [ $# -ge 2 ] || die "--cluster-server-eligible 缺少参数"; CLUSTER_SERVER_ELIGIBLE="$2"; shift 2 ;;
         --cluster-auto-apply) CLUSTER_AUTO_APPLY=1; shift ;;
@@ -134,7 +140,7 @@ esac
 case "$CLUSTER_BIND" in
     ''|*[!A-Za-z0-9.:_-]*) die "--cluster-bind 地址无效：$CLUSTER_BIND" ;;
 esac
-for cluster_port in "$CLUSTER_DISCOVERY_PORT" "$CLUSTER_TIME_PORT"; do
+for cluster_port in "$CLUSTER_DISCOVERY_PORT" "$CLUSTER_TIME_PORT" "$CLUSTER_NTP123_PORT"; do
     case "$cluster_port" in
         ''|*[!0-9]*) die "集群端口必须是数字：$cluster_port" ;;
     esac
@@ -224,6 +230,7 @@ if [ "$DRY_RUN" = "1" ]; then
     if [ "$CLUSTER_MODE" != "off" ]; then
         msg "集群参数 : id=$CLUSTER_ID bind=$CLUSTER_BIND discovery=$CLUSTER_DISCOVERY_PORT/udp time=$CLUSTER_TIME_PORT/udp eligible=$CLUSTER_SERVER_ELIGIBLE"
         msg "集群密钥 : $([ -n "$CLUSTER_SECRET_FILE" ] && printf '管理员预置 %s' "$CLUSTER_SECRET_FILE" || printf '安装时生成')"
+        msg "标准 NTP : $([ "$CLUSTER_NTP123" = "1" ] && printf '启用 UDP %s' "$CLUSTER_NTP123_PORT" || printf '关闭')"
     fi
     case "$PLATFORM" in
         audiosys)
@@ -264,6 +271,8 @@ CLUSTER_ID='$CLUSTER_ID'
 CLUSTER_BIND='$CLUSTER_BIND'
 CLUSTER_DISCOVERY_PORT='$CLUSTER_DISCOVERY_PORT'
 CLUSTER_TIME_PORT='$CLUSTER_TIME_PORT'
+CLUSTER_NTP123='$CLUSTER_NTP123'
+CLUSTER_NTP123_PORT='$CLUSTER_NTP123_PORT'
 CLUSTER_SERVER_ELIGIBLE='$CLUSTER_SERVER_ELIGIBLE'
 CLUSTER_AUTO_APPLY='$CLUSTER_AUTO_APPLY'
 CLUSTER_SEED='$CLUSTER_SEED'
@@ -287,6 +296,7 @@ if [ "$CLUSTER_MODE" != "off" ]; then
         --cluster-bind "$CLUSTER_BIND" --discovery-port "$CLUSTER_DISCOVERY_PORT" \
         --time-port "$CLUSTER_TIME_PORT" --server-eligible "$CLUSTER_SERVER_ELIGIBLE" \
         --cluster-secret-file "$data_dir/cluster.key" --cluster-state-dir "$data_dir/cluster-state"
+    if [ "$CLUSTER_NTP123" = "1" ]; then set -- "\$@" --cluster-ntp123 --cluster-ntp123-port "$CLUSTER_NTP123_PORT"; fi
     if [ "$CLUSTER_AUTO_APPLY" = "1" ]; then set -- "\$@" --auto-apply; fi
     if [ -n "$CLUSTER_SEED" ]; then set -- "\$@" --cluster-seed "$CLUSTER_SEED"; fi
 fi
