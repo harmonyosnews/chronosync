@@ -14,7 +14,7 @@ use crate::cluster::protocol::{
     Announce, KIND_CLAIM, KIND_HEARTBEAT, KIND_HELLO, KIND_RESIGN, PROTOCOL_VERSION, TimeRequest,
     TimeResponse,
 };
-use crate::cluster::{EventSink, TimeSource};
+use crate::cluster::{EventSink, REFERENCE_MAX_AGE_MS, TimeSource};
 use crate::ntp;
 
 const SERVER_TIMEOUT: Duration = Duration::from_millis(3_500);
@@ -133,7 +133,8 @@ impl Cluster {
             server_id,
             server_addr,
             peers: state.peers.len(),
-            ntp_verified: self.time_source.verified(),
+            ntp_verified: self.time_source.verified()
+                && self.time_source.age_ms() <= REFERENCE_MAX_AGE_MS,
             auto_apply: self.cfg.auto_apply,
             last_sync: state.last_sync.clone(),
             last_error: state.last_error.clone(),
@@ -330,7 +331,10 @@ impl Cluster {
                         send = Some(KIND_HELLO);
                     }
                     if now.duration_since(state.discovery_start) >= DISCOVERY_WINDOW {
-                        if self.cfg.server_eligible && self.time_source.verified() {
+                        if self.cfg.server_eligible
+                            && self.time_source.verified()
+                            && self.time_source.age_ms() <= REFERENCE_MAX_AGE_MS
+                        {
                             state.role = Role::Candidate;
                             state.claim_sent = false;
                             state.claims.clear();
@@ -478,7 +482,8 @@ impl Cluster {
             },
             term,
             eligible: self.cfg.server_eligible,
-            ntp_verified: self.time_source.verified(),
+            ntp_verified: self.time_source.verified()
+                && self.time_source.age_ms() <= REFERENCE_MAX_AGE_MS,
             server_epoch_ms: self.time_source.now_epoch_ms(),
             sent_at_ms: ntp::system_epoch_ms(),
             seq: self.next_seq(),
@@ -498,14 +503,16 @@ impl Cluster {
         destinations.extend(self.seeds.iter().copied());
         destinations.sort();
         destinations.dedup();
+        let mut sent = false;
         let mut last_error = None;
         for destination in destinations {
-            if let Err(err) = socket.send_to(&bytes, destination).await {
-                last_error = Some(err.to_string());
+            match socket.send_to(&bytes, destination).await {
+                Ok(_) => sent = true,
+                Err(err) => last_error = Some(err.to_string()),
             }
         }
-        if let Some(err) = last_error {
-            return Err(err);
+        if !sent {
+            return Err(last_error.unwrap_or_else(|| "没有可用的集群发送地址".to_string()));
         }
         Ok(())
     }

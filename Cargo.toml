@@ -1,6 +1,6 @@
 [package]
 name = "chronosync"
-version = "1.0.2"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.89"
 description = "ChronoSync — 通过 SSH 批量校准 Linux 设备时间的中文 Web 控制台"

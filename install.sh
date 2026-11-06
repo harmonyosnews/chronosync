@@ -4,7 +4,7 @@
 # AudioSys/Buildroot's /audiosys + CONFIG networkfs.sh hook model.
 set -u
 
-VERSION="1.0.2"
+VERSION="1.1.0"
 PREFIX="/opt/chronosync"
 AUDIO_BASE="/audiosys/chronosync"
 SELF_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
@@ -20,6 +20,15 @@ NO_START=0
 DRY_RUN=0
 PURGE=0
 PLATFORM=""
+CLUSTER_MODE="off"
+CLUSTER_ID="chronosync"
+CLUSTER_BIND="0.0.0.0"
+CLUSTER_DISCOVERY_PORT="18686"
+CLUSTER_TIME_PORT="18687"
+CLUSTER_SECRET_FILE=""
+CLUSTER_SERVER_ELIGIBLE="true"
+CLUSTER_AUTO_APPLY="0"
+CLUSTER_SEED=""
 
 msg()  { printf '[chronosync] %s\n' "$*"; }
 warn() { printf '[chronosync] 警告：%s\n' "$*" >&2; }
@@ -46,6 +55,15 @@ ChronoSync v$VERSION 安装器
   --no-start        只安装，不立即启动/重启服务
   --dry-run         只显示检测结果和安装计划，不修改系统
   --purge           卸载时同时删除日志和 AudioSys 持久目录
+  --cluster-mode MODE        off/server/client/auto（默认 off）
+  --cluster-id ID            集群标识（默认 chronosync）
+  --cluster-bind ADDR        集群 UDP 绑定地址（默认 0.0.0.0）
+  --cluster-discovery-port N 发现端口（默认 18686）
+  --cluster-time-port N      时间端口（默认 18687）
+  --cluster-secret-file PATH 管理员预置密钥；省略时安装器生成
+  --cluster-server-eligible true|false  是否可被选为 server（默认 true）
+  --cluster-auto-apply       client 自动写入本机时间（默认关闭）
+  --cluster-seed ADDR        额外 seed（ip:port，可逗号分隔）
   -h, --help        显示本帮助
 
 支持自动适配：
@@ -70,6 +88,15 @@ while [ $# -gt 0 ]; do
         --no-start) NO_START=1; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
         --purge) PURGE=1; shift ;;
+        --cluster-mode) [ $# -ge 2 ] || die "--cluster-mode 缺少参数"; CLUSTER_MODE=$(printf '%s' "$2" | tr 'A-Z' 'a-z'); shift 2 ;;
+        --cluster-id) [ $# -ge 2 ] || die "--cluster-id 缺少参数"; CLUSTER_ID="$2"; shift 2 ;;
+        --cluster-bind) [ $# -ge 2 ] || die "--cluster-bind 缺少参数"; CLUSTER_BIND="$2"; shift 2 ;;
+        --cluster-discovery-port) [ $# -ge 2 ] || die "--cluster-discovery-port 缺少参数"; CLUSTER_DISCOVERY_PORT="$2"; shift 2 ;;
+        --cluster-time-port) [ $# -ge 2 ] || die "--cluster-time-port 缺少参数"; CLUSTER_TIME_PORT="$2"; shift 2 ;;
+        --cluster-secret-file) [ $# -ge 2 ] || die "--cluster-secret-file 缺少参数"; CLUSTER_SECRET_FILE="$2"; shift 2 ;;
+        --cluster-server-eligible) [ $# -ge 2 ] || die "--cluster-server-eligible 缺少参数"; CLUSTER_SERVER_ELIGIBLE="$2"; shift 2 ;;
+        --cluster-auto-apply) CLUSTER_AUTO_APPLY=1; shift ;;
+        --cluster-seed) [ $# -ge 2 ] || die "--cluster-seed 缺少参数"; CLUSTER_SEED="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "未知参数：$1（使用 --help 查看用法）" ;;
     esac
@@ -94,6 +121,42 @@ if [ -n "$AUTH" ]; then
         *'
 '*) die "--auth 不能包含换行符" ;;
     esac
+fi
+
+case "$CLUSTER_MODE" in
+    off|server|client|auto) ;;
+    *) die "--cluster-mode 必须是 off/server/client/auto：$CLUSTER_MODE" ;;
+esac
+case "$CLUSTER_ID" in
+    ''|*[!A-Za-z0-9._-]*) die "--cluster-id 仅允许字母、数字、点、下划线、短横线：$CLUSTER_ID" ;;
+esac
+[ ${#CLUSTER_ID} -le 64 ] || die "--cluster-id 过长"
+case "$CLUSTER_BIND" in
+    ''|*[!A-Za-z0-9.:_-]*) die "--cluster-bind 地址无效：$CLUSTER_BIND" ;;
+esac
+for cluster_port in "$CLUSTER_DISCOVERY_PORT" "$CLUSTER_TIME_PORT"; do
+    case "$cluster_port" in
+        ''|*[!0-9]*) die "集群端口必须是数字：$cluster_port" ;;
+    esac
+    [ "$cluster_port" -ge 1 ] 2>/dev/null && [ "$cluster_port" -le 65535 ] 2>/dev/null || die "集群端口超出范围：$cluster_port"
+done
+[ "$CLUSTER_DISCOVERY_PORT" != "$CLUSTER_TIME_PORT" ] || die "发现端口和时间端口不能相同"
+case "$CLUSTER_SERVER_ELIGIBLE" in
+    true|false) ;;
+    *) die "--cluster-server-eligible 必须是 true 或 false" ;;
+esac
+if [ -n "$CLUSTER_SECRET_FILE" ] && [ ! -f "$CLUSTER_SECRET_FILE" ]; then
+    die "集群密钥文件不存在：$CLUSTER_SECRET_FILE"
+fi
+case "$CLUSTER_SEED" in
+    *[!A-Za-z0-9.,:_-]*) die "--cluster-seed 包含不支持的字符：$CLUSTER_SEED" ;;
+esac
+if [ "$CLUSTER_MODE" = "off" ] && [ "$CLUSTER_AUTO_APPLY" = "1" ]; then
+    warn "集群模式为 off，忽略 --cluster-auto-apply"
+    CLUSTER_AUTO_APPLY=0
+fi
+if [ "$CLUSTER_MODE" != "off" ] && [ ! -x "$BINARY" ] && [ "$DRY_RUN" != "1" ]; then
+    :
 fi
 
 if [ -z "$BINARY" ]; then
@@ -157,6 +220,11 @@ if [ "$DRY_RUN" = "1" ]; then
     msg "日志目录 : $LOG_DIR"
     msg "监听地址 : $BIND_HOST:$PORT"
     msg "访问认证 : $([ -n "$AUTH" ] && printf '已启用' || printf '未启用')"
+    msg "集群模式 : $CLUSTER_MODE"
+    if [ "$CLUSTER_MODE" != "off" ]; then
+        msg "集群参数 : id=$CLUSTER_ID bind=$CLUSTER_BIND discovery=$CLUSTER_DISCOVERY_PORT/udp time=$CLUSTER_TIME_PORT/udp eligible=$CLUSTER_SERVER_ELIGIBLE"
+        msg "集群密钥 : $([ -n "$CLUSTER_SECRET_FILE" ] && printf '管理员预置 %s' "$CLUSTER_SECRET_FILE" || printf '安装时生成')"
+    fi
     case "$PLATFORM" in
         audiosys)
             msg "将安装 : $PREFIX、$AUDIO_BASE、CONFIG 分区 networkfs.sh 开机钩子、/usr/local/bin/chronosyncctl"
@@ -191,12 +259,21 @@ PLATFORM='$PLATFORM'
 BIND='$BIND_HOST'
 PORT='$PORT'
 LOG_DIR='$LOG_DIR'
+CLUSTER_MODE='$CLUSTER_MODE'
+CLUSTER_ID='$CLUSTER_ID'
+CLUSTER_BIND='$CLUSTER_BIND'
+CLUSTER_DISCOVERY_PORT='$CLUSTER_DISCOVERY_PORT'
+CLUSTER_TIME_PORT='$CLUSTER_TIME_PORT'
+CLUSTER_SERVER_ELIGIBLE='$CLUSTER_SERVER_ELIGIBLE'
+CLUSTER_AUTO_APPLY='$CLUSTER_AUTO_APPLY'
+CLUSTER_SEED='$CLUSTER_SEED'
 EOF
     chmod 600 "$dest/install.conf"
 }
 
 write_run_script() {
     dest="$1"
+    data_dir="${2:-$PREFIX}"
     cat > "$dest" <<EOF
 #!/bin/sh
 AUTH_FILE="$PREFIX/auth"
@@ -204,7 +281,16 @@ if [ -r "\$AUTH_FILE" ]; then
     CHRONOSYNC_AUTH="\$(cat "\$AUTH_FILE")"
     export CHRONOSYNC_AUTH
 fi
-exec "$PREFIX/chronosync" --bind "$BIND_HOST" --port "$PORT" --log-dir "$LOG_DIR"
+set -- "$PREFIX/chronosync" --bind "$BIND_HOST" --port "$PORT" --log-dir "$LOG_DIR"
+if [ "$CLUSTER_MODE" != "off" ]; then
+    set -- "\$@" --cluster-mode "$CLUSTER_MODE" --cluster-id "$CLUSTER_ID" \
+        --cluster-bind "$CLUSTER_BIND" --discovery-port "$CLUSTER_DISCOVERY_PORT" \
+        --time-port "$CLUSTER_TIME_PORT" --server-eligible "$CLUSTER_SERVER_ELIGIBLE" \
+        --cluster-secret-file "$data_dir/cluster.key" --cluster-state-dir "$data_dir/cluster-state"
+    if [ "$CLUSTER_AUTO_APPLY" = "1" ]; then set -- "\$@" --auto-apply; fi
+    if [ -n "$CLUSTER_SEED" ]; then set -- "\$@" --cluster-seed "$CLUSTER_SEED"; fi
+fi
+exec "\$@"
 EOF
     chmod 755 "$dest"
 }
@@ -216,6 +302,36 @@ write_auth() {
         chmod 600 "$dest"
     else
         rm -f "$dest"
+    fi
+}
+
+install_cluster_files() {
+    dest="$1"
+    key_src="${2:-}"
+    if [ "$CLUSTER_MODE" = "off" ]; then
+        rm -f "$dest/cluster.key"
+        return 0
+    fi
+    mkdir -p "$dest/cluster-state" || die "无法创建集群状态目录：$dest/cluster-state"
+    chmod 700 "$dest/cluster-state" 2>/dev/null || true
+    if [ -n "$key_src" ] && [ -f "$key_src" ] && [ "$key_src" != "$dest/cluster.key" ]; then
+        cp -f "$key_src" "$dest/cluster.key" || die "复制集群密钥失败：$dest/cluster.key"
+    elif [ -n "$CLUSTER_SECRET_FILE" ] && [ "$CLUSTER_SECRET_FILE" != "$dest/cluster.key" ]; then
+        cp -f "$CLUSTER_SECRET_FILE" "$dest/cluster.key" || die "复制管理员预置密钥失败"
+    elif [ ! -s "$dest/cluster.key" ]; then
+        if command -v od >/dev/null 2>&1; then
+            dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n' > "$dest/cluster.key"
+        elif command -v base64 >/dev/null 2>&1; then
+            dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 | tr -d '\n' > "$dest/cluster.key"
+        else
+            die "无法生成集群密钥：缺少 od/base64；请使用 --cluster-secret-file"
+        fi
+    fi
+    [ -s "$dest/cluster.key" ] || die "集群密钥为空：$dest/cluster.key"
+    chmod 600 "$dest/cluster.key"
+    if [ -z "$CLUSTER_SECRET_FILE" ] && [ -z "$key_src" ]; then
+        warn "已在本机生成集群密钥：$dest/cluster.key"
+        warn "集群其他节点必须使用同一密钥文件（--cluster-secret-file），否则无法通过 HMAC 认证"
     fi
 }
 
@@ -243,9 +359,10 @@ install_files() {
     chmod 700 "$LOG_DIR"
     install_binary_atomic "$BINARY" "$PREFIX/chronosync" || die "复制二进制失败"
     self_install_copy "$PREFIX"
-    write_run_script "$PREFIX/run.sh"
+    write_run_script "$PREFIX/run.sh" "$PREFIX"
     write_auth "$PREFIX/auth"
     write_install_conf "$PREFIX"
+    install_cluster_files "$PREFIX"
 }
 
 write_chronosyncctl() {
@@ -626,6 +743,7 @@ do_install() {
     msg "系统类型 : $(platform_label)"
     msg "安装位置 : $PREFIX"
     msg "日志目录 : $LOG_DIR"
+    msg "集群模式 : $CLUSTER_MODE"
 
     case "$PLATFORM" in
         audiosys)
@@ -634,9 +752,10 @@ do_install() {
             install_files
             install_binary_atomic "$BINARY" "$AUDIO_BASE/chronosync" || die "复制持久二进制失败"
             self_install_copy "$AUDIO_BASE"
-            write_run_script "$AUDIO_BASE/run.sh"
+            write_run_script "$AUDIO_BASE/run.sh" "$AUDIO_BASE"
             write_auth "$AUDIO_BASE/auth"
             write_install_conf "$AUDIO_BASE"
+            install_cluster_files "$AUDIO_BASE" "$PREFIX/cluster.key"
             write_chronosyncctl "$AUDIO_BASE/chronosyncctl"
             mkdir -p /usr/local/bin
             ln -sf "$AUDIO_BASE/chronosyncctl" /usr/local/bin/chronosyncctl
@@ -694,7 +813,9 @@ do_uninstall() {
                 msg "已删除 AudioSys 持久目录和日志：$AUDIO_BASE"
             else
                 rm -f "$AUDIO_BASE/chronosync" "$AUDIO_BASE/run.sh" "$AUDIO_BASE/auth" \
-                      "$AUDIO_BASE/chronosyncctl" "$AUDIO_BASE/install.sh" "$AUDIO_BASE/install.conf"
+                      "$AUDIO_BASE/chronosyncctl" "$AUDIO_BASE/install.sh" "$AUDIO_BASE/install.conf" \
+                      "$AUDIO_BASE/cluster.key"
+                rm -rf "$AUDIO_BASE/cluster-state"
                 msg "已保留日志：$LOG_DIR（彻底删除请加 --purge）"
             fi
             ;;

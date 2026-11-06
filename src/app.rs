@@ -343,6 +343,19 @@ impl App {
         router
     }
 
+    pub async fn refresh_reference(&self) -> Result<(), String> {
+        match ntp::probe(&self.cfg.ntp_servers).await {
+            Ok(reference) => {
+                self.set_reference(reference);
+                Ok(())
+            }
+            Err(err) => {
+                self.log("warn", None, format!("后台 NTP 刷新失败：{err}"));
+                Err(err)
+            }
+        }
+    }
+
     pub fn set_cluster(&self, cluster: Arc<cluster::Cluster>) {
         *lock(&self.cluster) = Some(cluster);
     }

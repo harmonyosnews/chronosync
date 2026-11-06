@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use tokio::net::UdpSocket;
 
+use super::REFERENCE_MAX_AGE_MS;
 use super::manager::Cluster;
 use super::protocol::{PROTOCOL_VERSION, TimeRequest, TimeResponse};
-
-const REFERENCE_MAX_AGE_MS: u64 = 300_000;
 
 pub async fn run(cluster: Arc<Cluster>, socket: UdpSocket) {
     let mut buffer = [0u8; 4096];

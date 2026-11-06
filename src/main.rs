@@ -202,6 +202,16 @@ async fn main() {
             }
         }
     }
+    if cluster_mode != cluster::Mode::Off {
+        let refresh_app = app.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                tick.tick().await;
+                let _ = refresh_app.refresh_reference().await;
+            }
+        });
+    }
     let router = app.router();
 
     let attempts: u16 = if cli.auto_port { 10 } else { 0 };

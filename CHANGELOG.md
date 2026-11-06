@@ -23,8 +23,11 @@
 - `--cluster-mode off|server|client|auto`、集群 ID、node_id、发现/时间端口、seed、`--auto-apply` 等 CLI。
 - `src/cluster/`：配置/身份、HMAC-SHA256 控制消息、UDP 发现、选举/租约、NTP-like 时间服务、client 采样与安全写入。
 - `/api/cluster/state` 和 WebUI 集群状态徽标。
-- 本地验证：手动 server/client、两节点自动选举、server 退出重选、非 root 自动写入安全拒绝。
-- 当前不发布 1.1.0；安装器、多平台集群实测、完整闸门和独立 Release 待完成。
+- 安装器集群参数、共享密钥生成/管理员预置、服务启动参数和防火墙提示。
+- 后台 NTP 周期刷新；参考年龄超过 5 分钟的 server 停止供时。
+- 版本提升到 1.1.0；Linux v1–v4、Windows generic 启动验证。
+- 本地验证：手动 server/client、两节点自动选举、server 退出重选、错误密钥/未验证 NTP 拒绝、非 root 自动写入安全拒绝。
+- 当前不发布 1.1.0；ARM64 集群实测、多主机故障矩阵、实际 root 安装、完整闸门和独立 Release 待完成。
 
 ## 1.0.2 - 2026-11-05
 

@@ -6,6 +6,8 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 
 发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2>
 
+`1.1.0` 的 Server/Client 自动选举集群模式正在 `feat/cluster-mode` 分支开发，尚未发布；设计见 [集群模式详细设计与排期](docs/集群模式详细设计与排期.md)。
+
 文档基线：2026-11-06。24 小时长稳测试已按项目决定取消，不列入本版验收或闸门。
 
 ![ChronoSync 控制台](docs/dashboard.png)

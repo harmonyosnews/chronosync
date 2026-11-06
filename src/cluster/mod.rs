@@ -8,6 +8,8 @@ use std::sync::Arc;
 pub use config::{Config, Mode, load_secret, resolve_node_id};
 pub use manager::{Cluster, ClusterView};
 
+pub(crate) const REFERENCE_MAX_AGE_MS: u64 = 300_000;
+
 pub trait TimeSource: Send + Sync {
     fn now_epoch_ms(&self) -> i64;
     fn verified(&self) -> bool;
