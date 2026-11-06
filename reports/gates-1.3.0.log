@@ -13,5 +13,5 @@ G9 partition matrix PASS (4/4; script scripts/cluster_matrix.py)
 G10 package PASS (7 archives, SHA256SUMS)
 G11 sensitive PASS
 G12 version PASS (1.3.0)
-G13 release PENDING
+G13 release PASS (Release 436157350, commit cc2aa3a, 14 assets digest verified)
 G14 docs PASS (129 links, 0 missing)

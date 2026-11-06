@@ -1,10 +1,12 @@
 # ChronoSync v1.3.0 发布报告
 
-- 状态：**发布候选，待上传**
+- 状态：**已发布并部署**
 - 目标仓库：`https://github.com/harmonyosnews/chronosync`
 - 版本：**1.3.0**
 - tag：`v1.3.0`
 - 构建时间：`20261106-140000`
+- 冻结 commit：`cc2aa3ad4167fd186532a3b0b63ea99a61a8f9b6`
+- Release ID：`436157350`
 - 发布页：`https://github.com/harmonyosnews/chronosync/releases/tag/v1.3.0`
 
 ## 重点
@@ -34,4 +36,6 @@
 
 ## 回填
 
-Release ID、tag/commit、资产 digest 待上传后补充。
+- 冻结 commit `cc2aa3a`，annotated tag `v1.3.0`
+- 14 个资产：7 归档 + SHA256SUMS + 5 报告 + 1 手册 PDF；GitHub digest 回读匹配
+- 11/11 验证机已部署 1.3.0；1 server + 10 client，全部 applied=false
