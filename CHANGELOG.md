@@ -9,6 +9,7 @@
 - 静态 PIE 链接修正：`relocation-model=static` + `-no-pie`，产物无动态加载器。
 - Innuos（glibc 2.31）与 RoonServer（缺少动态加载器）已用静态包验证可执行。
 - 增加静态兼容验证与部署文档；Windows generic 同步到 1.2.0。
+- 11 台可达验证机完成 1.2.0 静态安装并启动：1 server + 10 client，`auto_apply=false`，未写时钟。
 
 ### Changed
 

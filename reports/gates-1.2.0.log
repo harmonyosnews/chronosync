@@ -19,5 +19,13 @@ Build: 20261106-133000
 == G10 sensitive == PASS
 == G11 version == PASS (1.2.0)
 == G12 auto-port == PASS (final 1.2.0: 1015 denied -> 1024 bound, health 200)
-== G13 release == PENDING
-== G14 docs == PASS (repo links checked; final release links pending upload)
+== G13 release == PASS
+- tag v1.2.0 -> dcc36d0; Release ID 436114558
+- initial assets 8, GitHub digest matched
+- reports uploaded after this log update
+
+== G15 deployment == PASS
+- 11/11 accessible validation hosts installed 1.2.0
+- 1 server + 10 clients running; all applied=false, no clock writes
+- `.205` excluded (unreachable)
+== G14 docs == PASS (repo links checked; release/deployment links added)

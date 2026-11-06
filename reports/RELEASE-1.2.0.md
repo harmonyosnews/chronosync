@@ -1,9 +1,12 @@
 # ChronoSync v1.2.0 发布报告
 
-- 状态：**发布候选，待 GitHub 上传**
+- 状态：**已发布并部署**
 - 目标仓库：`https://github.com/harmonyosnews/chronosync`
 - 发布版本：**1.2.0**
 - 发布 tag：`v1.2.0`
+- 冻结 commit：`dcc36d00471fd7cc536fcaec7c21cd0eb7728d02`
+- Release ID：`436114558`
+- 发布页：`https://github.com/harmonyosnews/chronosync/releases/tag/v1.2.0`
 - 构建时间：`20261106-133000`
 - 发布方式：源码提交 + GitHub Release 资产
 - WebUI：编译时嵌入单文件二进制
@@ -25,6 +28,7 @@
 | Innuos / RoonServer | 静态包 `--version` = 1.2.0；Innuos 参与静态集群 |
 | 9 节点集群矩阵 | 1.1.0 同源代码通过 |
 | 1.2.0 静态集群 | ARM server + x86 + Innuos client，同一 server，Innuos offset 19ms、applied=false |
+| 11 台部署 | 11/11 安装 1.2.0 并启动；1 server + 10 client，全部 applied=false |
 | Windows/ARM 启动 | 1.2.0 构建/启动验证 |
 | 包/哈希 | 7 归档 OK；SHA256SUMS 全 OK |
 | 敏感扫描 | 0 |
@@ -42,8 +46,13 @@
 - Linux x86_64 v1/v2/v3/v4 static
 - Linux ARM64 armv8a static
 - Windows x86_64 generic
-- source、SHA256SUMS、build/cluster reports
+- source、SHA256SUMS、build/cluster/deployment reports
+- 可打印使用手册 `ChronoSync-使用手册-v1.2.0.pdf`（17 页）
 
 ## 5. 发布后回填
 
-Release ID、tag 指向 commit、资产回读 digest 待上传后补充。
+- Release ID：`436114558`
+- 冻结 commit：`dcc36d00471fd7cc536fcaec7c21cd0eb7728d02`
+- annotated tag：`v1.2.0`
+- 8 个初始资产已上传并完成 GitHub digest 回读
+- 11 台验证机部署完成；详见 `reports/DEPLOYMENT-1.2.0.md`
