@@ -1487,6 +1487,10 @@
       </span>
     </a>
     <div class="top-actions">
+      <div id="cluster-status" class="status-pill idle" title="集群模式状态">
+        <span class="status-dot"></span>
+        <span id="cluster-status-text">集群 —</span>
+      </div>
       <div id="server-status" class="status-pill idle" title="标准时间源状态">
         <span class="status-dot"></span>
         <span id="server-status-text">正在连接</span>
@@ -1777,6 +1781,7 @@
 
   function cacheElements() {
     const ids = [
+      "cluster-status", "cluster-status-text",
       "server-status", "server-status-text", "refresh-ref",
       "sync-all", "sync-all-label", "sync-local", "sync-local-label", "local-hint",
       "opt-hwclock", "opt-timezone", "opt-dryrun",
@@ -2319,6 +2324,22 @@
     }
   }
 
+  function updateClusterUi(cluster) {
+    if (!cluster) {
+      ui.clusterStatus.className = "status-pill idle";
+      ui.clusterStatusText.textContent = "集群未启用";
+      ui.clusterStatus.title = "当前以单机模式运行";
+      return;
+    }
+    const role = cluster.role === "server" ? "Server" : cluster.role === "candidate" ? "选举中" : cluster.role === "discovering" ? "发现中" : "Client";
+    const healthy = cluster.ntp_verified && !cluster.last_error;
+    ui.clusterStatus.className = "status-pill " + (healthy ? "ok" : "warn");
+    ui.clusterStatusText.textContent = "集群 " + role;
+    ui.clusterStatus.title = `mode=${cluster.mode} term=${cluster.term} peers=${cluster.peers}` +
+      (cluster.server_id ? ` server=${cluster.server_id}` : "") +
+      (cluster.last_error ? ` · ${cluster.last_error}` : "");
+  }
+
   function setStatus(text, variant) {
     ui.serverStatus.className = "status-pill " + variant;
     ui.serverStatusText.textContent = text;
@@ -2334,6 +2355,7 @@
 
     syncClockTo(data.now_epoch_ms);
     updateSourceUi();
+    updateClusterUi(data.cluster);
     updateStats();
     updateLogMeta();
     applyServerToRows();

@@ -7,3 +7,6 @@
 .DS_Store
 /winlogs*
 /.dsh-secrets
+
+# cluster runtime state/node-id
+/cluster-state/

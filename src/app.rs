@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedMutexGuard, Semaphore};
 use tokio::task::JoinSet;
 
+use crate::cluster::{self, ClusterView};
 use crate::local::{self, LocalEnvironment};
 use crate::ntp::{self, TimeReference};
 use crate::remote::{self, OptionalStep, RemoteTarget, SshClient, SyncOptions};
@@ -40,6 +41,7 @@ pub struct App {
     inner: Arc<Inner>,
     cfg: Arc<Config>,
     local: LocalEnvironment,
+    cluster: Mutex<Option<Arc<cluster::Cluster>>>,
 }
 
 struct Inner {
@@ -122,6 +124,7 @@ pub struct StateResponse {
     pub scanning: bool,
     pub sync_ready: bool,
     pub run: Option<RunView>,
+    pub cluster: Option<ClusterView>,
     pub machines: Vec<MachineState>,
     pub logs: Vec<LogEntry>,
     pub log_total: u64,
@@ -269,6 +272,7 @@ impl App {
             }),
             cfg: Arc::new(cfg),
             local,
+            cluster: Mutex::new(None),
         });
 
         match ntp::probe(&app.cfg.ntp_servers).await {
@@ -329,6 +333,7 @@ impl App {
             .route("/api/scan", post(scan_lan))
             .route("/api/logs/download", get(download_logs))
             .route("/api/health", get(health))
+            .route("/api/cluster/state", get(cluster_state))
             .layer(DefaultBodyLimit::max(512 * 1024))
             .layer(middleware::from_fn(security_headers))
             .with_state(self.clone());
@@ -336,6 +341,14 @@ impl App {
             router = router.layer(middleware::from_fn_with_state(auth_app, auth_middleware));
         }
         router
+    }
+
+    pub fn set_cluster(&self, cluster: Arc<cluster::Cluster>) {
+        *lock(&self.cluster) = Some(cluster);
+    }
+
+    pub fn cluster_view(&self) -> Option<ClusterView> {
+        lock(&self.cluster).as_ref().map(|cluster| cluster.view())
     }
 
     pub fn console_summary(&self, address: &str) -> String {
@@ -378,6 +391,15 @@ impl App {
         }
         if !self.cfg.allow_system_clock {
             lines.push("安全策略: NTP 不可达时将拒绝校时（防止写入错误时间）".to_string());
+        }
+        if let Some(cluster) = self.cluster_view() {
+            lines.push(format!(
+                "集群: mode={} role={} server={} peers={}",
+                cluster.mode,
+                cluster.role,
+                cluster.server_id.as_deref().unwrap_or("-"),
+                cluster.peers
+            ));
         }
         lines.join("\n")
     }
@@ -1226,6 +1248,7 @@ impl App {
             scanning: self.inner.scanning.load(Ordering::SeqCst),
             sync_ready: self.sync_ready(),
             run: lock(&self.inner.run).clone(),
+            cluster: self.cluster_view(),
             machines,
             logs,
             log_total,
@@ -1250,6 +1273,10 @@ async fn index() -> impl IntoResponse {
 
 async fn favicon() -> Response {
     StatusCode::NO_CONTENT.into_response()
+}
+
+async fn cluster_state(State(app): State<Arc<App>>) -> Json<Option<ClusterView>> {
+    Json(app.cluster_view())
 }
 
 async fn health(State(app): State<Arc<App>>) -> Json<serde_json::Value> {
@@ -1840,6 +1867,34 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+impl cluster::TimeSource for App {
+    fn now_epoch_ms(&self) -> i64 {
+        self.now_standard_ms()
+    }
+
+    fn verified(&self) -> bool {
+        self.current_reference()
+            .map(|reference| reference.verified)
+            .unwrap_or(false)
+    }
+
+    fn age_ms(&self) -> u64 {
+        self.current_reference()
+            .map(|reference| reference.age_ms())
+            .unwrap_or(u64::MAX)
+    }
+}
+
+impl cluster::EventSink for App {
+    fn log(&self, level: &str, message: String) {
+        App::log(self, level, None, message);
+    }
+
+    fn apply_time(&self, epoch_ms: i64) -> Result<(), String> {
+        local::set_system_time(epoch_ms)
+    }
 }
 
 #[cfg(test)]

@@ -340,6 +340,7 @@ dependencies = [
  "dns-lookup",
  "if-addrs",
  "libc",
+ "ring",
  "russh",
  "serde",
  "serde_json",

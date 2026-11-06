@@ -1,4 +1,5 @@
 mod app;
+mod cluster;
 mod local;
 mod ntp;
 mod remote;
@@ -54,6 +55,70 @@ struct Cli {
     /// 请求端口被占用时，自动尝试后续 10 个端口
     #[arg(long)]
     auto_port: bool,
+
+    /// 集群模式：off / server / client / auto
+    #[arg(
+        long,
+        default_value = "off",
+        value_parser = ["off", "server", "client", "auto"]
+    )]
+    cluster_mode: String,
+
+    /// 集群标识，同一集群必须一致
+    #[arg(long, default_value = "chronosync")]
+    cluster_id: String,
+
+    /// 固定节点标识；省略时在状态目录生成并复用
+    #[arg(long)]
+    node_id: Option<String>,
+
+    /// 集群共享密钥文件（非 off 模式必填，至少 16 字节）
+    #[arg(long)]
+    cluster_secret_file: Option<PathBuf>,
+
+    /// 集群 UDP 绑定地址（测试多实例时可指定回环地址）
+    #[arg(long, default_value = "0.0.0.0")]
+    cluster_bind: String,
+
+    /// 集群发现 UDP 端口
+    #[arg(long, default_value_t = 18686)]
+    discovery_port: u16,
+
+    /// 集群时间服务 UDP 端口
+    #[arg(long, default_value_t = 18687)]
+    time_port: u16,
+
+    /// 是否允许本节点被选为 server
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    server_eligible: bool,
+
+    /// client 自动写入本机时间；默认关闭，只检测
+    #[arg(long)]
+    auto_apply: bool,
+
+    /// 自动写入的最小偏差阈值（毫秒）
+    #[arg(long, default_value_t = 100)]
+    max_offset_ms: i64,
+
+    /// 单次允许的最大时间跳变（毫秒）
+    #[arg(long, default_value_t = 5000)]
+    max_step_ms: i64,
+
+    /// 允许超过 max_step_ms 的大步长写入
+    #[arg(long)]
+    allow_large_step: bool,
+
+    /// client 同步间隔（秒）
+    #[arg(long, default_value_t = 60)]
+    sync_interval: u64,
+
+    /// 集群状态目录（node-id）
+    #[arg(long, default_value = "./cluster-state")]
+    cluster_state_dir: PathBuf,
+
+    /// 额外 seed 地址（ip:port），可重复或逗号分隔
+    #[arg(long, value_delimiter = ',')]
+    cluster_seed: Vec<String>,
 }
 
 struct ExistingInstance {
@@ -91,6 +156,52 @@ async fn main() {
         auth_header,
     };
     let app = app::App::new(config, local_environment).await;
+    let cluster_mode = cluster::Mode::parse(&cli.cluster_mode).unwrap_or_else(|| {
+        eprintln!("错误：无效的 --cluster-mode {}", cli.cluster_mode);
+        std::process::exit(2);
+    });
+    if cluster_mode != cluster::Mode::Off {
+        let secret_path = cli.cluster_secret_file.as_ref().unwrap_or_else(|| {
+            eprintln!("错误：集群模式需要 --cluster-secret-file");
+            std::process::exit(2);
+        });
+        let secret = cluster::load_secret(secret_path).unwrap_or_else(|err| {
+            eprintln!("错误：{err}");
+            std::process::exit(2);
+        });
+        let node_id = cluster::resolve_node_id(cli.node_id.as_deref(), &cli.cluster_state_dir)
+            .unwrap_or_else(|err| {
+                eprintln!("错误：{err}");
+                std::process::exit(2);
+            });
+        let listen_ip = cli.cluster_bind.parse().unwrap_or_else(|_| {
+            eprintln!("错误：无效的 --cluster-bind {}", cli.cluster_bind);
+            std::process::exit(2);
+        });
+        let cluster_cfg = cluster::Config {
+            mode: cluster_mode,
+            cluster_id: cli.cluster_id.clone(),
+            node_id,
+            secret,
+            listen_ip,
+            discovery_port: cli.discovery_port,
+            time_port: cli.time_port,
+            server_eligible: cli.server_eligible,
+            auto_apply: cli.auto_apply,
+            max_offset_ms: cli.max_offset_ms,
+            max_step_ms: cli.max_step_ms,
+            allow_large_step: cli.allow_large_step,
+            sync_interval: Duration::from_secs(cli.sync_interval),
+            seed_peers: cli.cluster_seed.clone(),
+        };
+        match cluster::start(cluster_cfg, app.clone(), app.clone()).await {
+            Ok(cluster) => app.set_cluster(cluster),
+            Err(err) => {
+                eprintln!("错误：集群启动失败：{err}");
+                std::process::exit(1);
+            }
+        }
+    }
     let router = app.router();
 
     let attempts: u16 = if cli.auto_port { 10 } else { 0 };

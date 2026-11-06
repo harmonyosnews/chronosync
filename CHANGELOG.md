@@ -16,6 +16,16 @@
 - README 增加文档地图和项目结构说明。
 - 无运行时、安装器、WebUI、依赖或发布资产变更。
 
+## Unreleased — 1.1.0 cluster mode (in progress)
+
+### Added
+
+- `--cluster-mode off|server|client|auto`、集群 ID、node_id、发现/时间端口、seed、`--auto-apply` 等 CLI。
+- `src/cluster/`：配置/身份、HMAC-SHA256 控制消息、UDP 发现、选举/租约、NTP-like 时间服务、client 采样与安全写入。
+- `/api/cluster/state` 和 WebUI 集群状态徽标。
+- 本地验证：手动 server/client、两节点自动选举、server 退出重选、非 root 自动写入安全拒绝。
+- 当前不发布 1.1.0；安装器、多平台集群实测、完整闸门和独立 Release 待完成。
+
 ## 1.0.2 - 2026-11-05
 
 ### Added
