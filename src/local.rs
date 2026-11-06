@@ -53,6 +53,7 @@ pub fn set_system_time(epoch_ms: i64) -> Result<(), String> {
 }
 
 #[cfg(unix)]
+#[allow(deprecated)] // musl deprecates libc::time_t in favor of a future 64-bit alias; tv_sec still needs the platform type.
 fn set_system_time_impl(epoch_ms: i64) -> Result<(), String> {
     let seconds = epoch_ms.div_euclid(1000);
     let nanoseconds = (epoch_ms.rem_euclid(1000) * 1_000_000) as libc::c_long;

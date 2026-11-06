@@ -6,17 +6,17 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 产品版本 | `1.1.0` |
-| 发布 tag | `v1.1.0`（发布后以 tag 指向的冻结 commit 为准） |
-| 发布页 | <https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0> |
+| 产品版本 | `1.2.0` |
+| 发布 tag | `v1.2.0`（发布后以 tag 指向的冻结 commit 为准） |
+| 发布页 | <https://github.com/harmonyosnews/chronosync/releases/tag/v1.2.0> |
 | 文档基线日期 | 2026-11-06 |
-| 运行时状态 | 1.1.0 六平台发布包；1.0.2 历史资产保留 |
+| 运行时状态 | 1.2.0 Linux 静态包 + Windows/ARM；1.0.2/1.1.0 历史资产保留 |
 | 长稳测试 | 24 小时长稳测试项已按项目决定取消，不列入本版交付或闸门 |
 | 后续版本 | 未排期；代码优化/静态构建候选见 `Issues整理.md` |
 
-> 1.1.0 的 tag 和 Release 资产在发布后冻结；任何后续运行时或安装器修改都必须进入新版本流程。
+> 1.2.0 的 tag 和 Release 资产在发布后冻结；任何后续运行时或安装器修改都必须进入新版本流程。
 
-> 版本说明：项目书、可行性分析、实施方案、开发手册、审计报告中的 1.0.2 数字是历史基线；1.1.0 集群模式的当前证据以 `reports/RELEASE-1.1.0.md`、`BUILD-1.1.0.md`、`CLUSTER-TESTS-1.1.0.md` 为准。
+> 版本说明：项目书、可行性分析、实施方案、开发手册、审计报告中的 1.0.2 数字是历史基线；1.2.0 静态构建/集群证据以 `reports/RELEASE-1.2.0.md`、`BUILD-1.2.0.md`、`CLUSTER-TESTS-1.1.0.md` 为准。
 
 ## 2. 文档地图
 
@@ -43,9 +43,9 @@
 
 发布证据原始材料在 `reports/`：
 
-- [发布报告](../reports/RELEASE-1.1.0.md)
-- [构建与包校验](../reports/BUILD-1.1.0.md)
-- [1.1.0 集群测试](../reports/CLUSTER-TESTS-1.1.0.md)
+- [发布报告](../reports/RELEASE-1.2.0.md)
+- [构建与包校验](../reports/BUILD-1.2.0.md)
+- [集群/静态兼容测试](../reports/CLUSTER-TESTS-1.1.0.md)
 - [1.0.2 历史发布报告](../reports/RELEASE-1.0.2.md)
 - [1.0.2 历史闸门日志](../reports/gates-1.0.2.log)
 

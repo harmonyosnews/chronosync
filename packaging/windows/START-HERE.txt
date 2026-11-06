@@ -1,4 +1,4 @@
-ChronoSync v1.1.0 - Windows x86_64
+ChronoSync v1.2.0 - Windows x86_64
 =================================
 
 直接双击 start-chronosync.bat。
@@ -26,4 +26,4 @@ Windows 没有 kill/pkill 命令。
 - “本机校时”需右键以管理员身份运行；远程校时不需要管理员。
 - Windows 上 RTC 独立写入和时区切换会跳过。
 - WebUI 已嵌入 exe，不需要 web 目录。
-- 发布页：https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0
+- 发布页：https://github.com/harmonyosnews/chronosync/releases/tag/v1.2.0

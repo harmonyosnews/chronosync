@@ -4,7 +4,7 @@
 # AudioSys/Buildroot's /audiosys + CONFIG networkfs.sh hook model.
 set -u
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 PREFIX="/opt/chronosync"
 AUDIO_BASE="/audiosys/chronosync"
 SELF_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)

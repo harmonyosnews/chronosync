@@ -5,9 +5,9 @@
 ## 1. 项目坐标
 
 - 仓库根：`/home/kele/harmonyosnews/chronosync`
-- 产品版本：`1.1.0`
-- 发布 tag：`v1.1.0`（发布后以 tag 指向的冻结 commit 为准）
-- 发布页：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0>
+- 产品版本：`1.2.0`
+- 发布 tag：`v1.2.0`（发布后以 tag 指向的冻结 commit 为准）
+- 发布页：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.2.0>
 - 技术栈：Rust 2024 / Tokio / Axum / russh / 单文件 WebUI
 - 文档基线：2026-11-06；24 小时长稳测试已取消
 
@@ -25,8 +25,8 @@
 - **不伪造测试**：未执行写 `NOT RUN`；取消写 `CANCELED`；不能用“之前跑过”代替当前版本。
 - **不泄露凭据**：密码/token/私钥不得出现在命令参数、日志、截图、文档、Issue、提交、Release。
 - **不写入生产时钟**：默认 `dry_run=true`；真实写入需用户明确授权和维护窗口。
-- **不改已发布资产**：`v1.1.0` tag/Release 不可改写；运行时/UI/安装器变更必须新版本。
-- **不声称静态支持**：当前发布为动态 glibc；musl 方案未实施/未验收。
+- **不改已发布资产**：`v1.2.0` tag/Release 不可改写；运行时/UI/安装器变更必须新版本。
+- **静态支持已实现**：Linux x86_64 v1-v4、ARM64 为 musl 静态；Innuos/RoonServer 已用静态包验证。
 - **不恢复 24h 测试**：该项已取消；除非用户明确恢复并另立计划。
 - **不提交真实内网清单**：示例用 RFC 5737 地址（192.0.2.0/24 等）。
 
@@ -75,7 +75,7 @@ node --check /tmp/chronosync-ui.js
 
 ## 7. 已发布边界
 
-- 1.1.0 的动态 glibc 包、Windows/ARM64 包、`SHA256SUMS` 和 Release 资产是冻结证据；1.0.2 资产保留为历史。
+- 1.2.0 的 Linux 静态包、Windows 包、`SHA256SUMS` 和 Release 资产是冻结证据；1.0.2/1.1.0 资产保留为历史。
 - 文档提交可以修正描述，但不能改变已发布二进制或包哈希。
 - 若用户要求修复运行时缺陷：先确认是否发新版本；不要直接改 tag 后重建同名资产。
 - 代码去重候选（Issues ISS-007–010）留到新版本，不在文档任务中顺手改。

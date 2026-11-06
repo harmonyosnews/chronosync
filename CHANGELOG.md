@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0 - 2026-11-06
+
+### Added
+
+- Linux x86_64 v1/v2/v3/v4 与 ARM64 改为 **musl 静态链接**，不依赖目标 glibc。
+- x86_64 变体在 `.133` 的 Debian 11 Docker 构建；ARM64 在 `.230` 原生 musl 构建。
+- 静态 PIE 链接修正：`relocation-model=static` + `-no-pie`，产物无动态加载器。
+- Innuos（glibc 2.31）与 RoonServer（缺少动态加载器）已用静态包验证可执行。
+- 增加静态兼容验证与部署文档；Windows generic 同步到 1.2.0。
+
+### Changed
+
+- 发布包命名增加 `static` 标签；BUILD-INFO 记录 musl target 和“无 glibc 依赖”。
+- 版本提升到 1.2.0。
+
+### Known Limitations
+
+- 集群默认 off；生产建议手动 server，auto 仅实验。
+- 首版单 L2，不使用标准 NTP 123。
+- 广播阻断/分区脑裂完整矩阵未完成。
+- Windows 仍为 MinGW 原生包，不是 musl 静态。
+
 ## 1.1.0 - 2026-11-06
 
 ### Added

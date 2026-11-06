@@ -1,0 +1,23 @@
+ChronoSync v1.2.0 gates
+2026-11-06
+Build: 20261106-133000
+
+== G1 fmt == PASS
+== G2 clippy -D warnings == PASS
+== G3 tests == PASS (31 passed)
+== G4 WebUI JS == PASS
+== G5 browser == PASS (v1.2.0 footer, cluster Server badge, console/page errors 0)
+== G6 installer == PASS
+- 1.2.0 static package actual root install/uninstall on systemd test VM
+- service inactive, no clock writes; /opt and unit cleaned after uninstall
+== G7 platform build == PASS (x86 v1-v4 static; ARM64 static; Windows)
+== G8 real/static == PASS
+- 9-node 1.1.0 matrix: ARM server + 8 clients, 10s/20s same server
+- 1.2.0 static cluster: ARM server + .133 x86 + Innuos client; all same server, Innuos offset 19ms, applied=false
+- Innuos/RoonServer static `--version` = 1.2.0
+== G9 package == PASS (7 archives, static binaries, SHA256SUMS)
+== G10 sensitive == PASS
+== G11 version == PASS (1.2.0)
+== G12 auto-port == PASS (final 1.2.0: 1015 denied -> 1024 bound, health 200)
+== G13 release == PENDING
+== G14 docs == PASS (repo links checked; final release links pending upload)
