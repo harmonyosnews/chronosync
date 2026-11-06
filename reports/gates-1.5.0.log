@@ -13,7 +13,7 @@ G9 package PASS (7 archives; SHA256SUMS; binary hashes; Windows CRLF)
 G10 sensitive PASS (token/private key/real private IPv4/AWS key = 0)
 G11 version PASS (1.5.0 source/UI/installer/packages)
 G12 auto-port PASS (Linux 18890->18891; Windows 18889->18890)
-G13 release read-back PENDING (no Release yet)
+G13 release read-back PASS (Release 436265248; tag v1.5.0; 14 assets digest verified)
 G14 docs links PASS (39 markdown; 138 relative links; 0 missing)
 
 Additional: real client auto_apply true->false state/runtime.json persisted; no clock write; NTPv4 toggle 48B/LI0/VN4/mode4/stratum3; restart instance_id change.
