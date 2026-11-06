@@ -73,7 +73,14 @@ PASS
 PASS (existing logic retained; Linux permission-error fallback and Windows 445->446 previously verified)
 
 == G13 release read-back ==
-PENDING (upload and public digest check)
+PASS
+- release commit: 74ddb958dca273a948ecb735697d5a202dae7bf7
+- annotated tag: v1.1.0 -> 70c472a9e8dc943c5af02f040a67ebd4eb264b31 -> 74ddb95
+- release ID: 436086887
+- release URL: https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0
+- initial assets: 8 (6 platform packages, source, SHA256SUMS)
+- remote asset sizes and sha256 digests: all match local files
+- report assets: RELEASE-1.1.0.md / BUILD-1.1.0.md / CLUSTER-TESTS-1.1.0.md uploaded after this log update
 
 == G14 documentation ==
 PASS

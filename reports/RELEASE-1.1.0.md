@@ -1,9 +1,12 @@
 # ChronoSync v1.1.0 发布报告
 
-- 状态：**发布候选，待 GitHub 上传与回读**
+- 状态：**已发布**
 - 目标仓库：`https://github.com/harmonyosnews/chronosync`
 - 发布版本：**1.1.0**
 - 发布 tag：`v1.1.0`
+- 冻结 commit：`74ddb958dca273a948ecb735697d5a202dae7bf7`
+- Release ID：`436086887`
+- 发布页：`https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0`
 - 构建时间：`20261106-130000`
 - 发布方式：源码提交 + GitHub Release 二进制资产
 - WebUI：编译时嵌入，单文件可执行
@@ -99,4 +102,10 @@ sudo ./install.sh --cluster-mode client --cluster-id lab \
 
 ## 7. 发布后回填
 
-Release ID、tag 指向 commit、资产回读 digest 在上传后补充；技术产物以 Release 资产和 `SHA256SUMS` 为准。
+- 仓库：`harmonyosnews/chronosync`，公开仓库，默认分支 `main`
+- tag：`v1.1.0`，annotated tag `70c472a9e8dc943c5af02f040a67ebd4eb264b31`，指向冻结 commit `74ddb958dca273a948ecb735697d5a202dae7bf7`
+- Release：ID `436086887`，`https://github.com/harmonyosnews/chronosync/releases/tag/v1.1.0`
+- 初传资产 8 个：6 个平台包、source 包、`SHA256SUMS`；GitHub 回读大小和 `sha256:` digest 与本地一致
+- 本报告、构建报告、集群测试报告随后作为 Release 文本资产上传
+- 发布后的文档回填提交只修改报告/闸门状态，不改变二进制、源包或 tag
+- 技术产物以冻结 commit、Release 资产和 `SHA256SUMS` 为准
