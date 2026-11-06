@@ -6,7 +6,25 @@ WebUI 通过 `include_str!` 编译进主程序，运行时不需要 `web/` 目�
 
 发布页（二进制包、源码包与 SHA256）：<https://github.com/harmonyosnews/chronosync/releases/tag/v1.0.2>
 
+文档基线：2026-11-06。24 小时长稳测试已按项目决定取消，不列入本版验收或闸门。
+
 ![ChronoSync 控制台](docs/dashboard.png)
+
+## 项目文档
+
+完整索引和单一事实源约定见 [docs/README.md](docs/README.md)。
+
+| 文档 | 用途 |
+| --- | --- |
+| [使用手册](使用手册.md) | 安装、校时、扫描、排障 |
+| [项目书](docs/项目书.md) / [可行性分析](docs/可行性分析.md) | 目标、范围、可行性结论 |
+| [实施方案](docs/实施方案.md) | 架构、部署、回滚 |
+| [开发手册](docs/开发手册.md) / [程序接口](docs/程序接口.md) | 代码结构、CLI/HTTP 契约 |
+| [实测证据与复现](docs/实测证据与复现.md) / [实施与验收记录](docs/实施与验收记录.md) | 测试证据、验收结果 |
+| [审计报告](docs/审计报告.md) / [Issues 整理](docs/Issues整理.md) | 风险、债务、问题台账 |
+| [纪律与闸门](docs/纪律与闸门.md) / [工程纪律](工程纪律.md) | 质量闸门、工程规则 |
+| [编译环境与静态编译](docs/程序编译环境的搭建与实施-静态编译.md) | 工具链、动态/静态构建 |
+| [项目管理与排期](项目管理与排期.md) / [AGENTS.md](AGENTS.md) | 里程碑、代理规则 |
 
 ## 功能
 
@@ -403,8 +421,18 @@ chronosync/
 ├── web/
 │   └── index.html    单文件 Web 控制台（编译时嵌入二进制）
 ├── docs/
+│   ├── README.md      文档索引与单一事实源
+│   ├── 项目书.md / 可行性分析.md / 实施方案.md
+│   ├── 开发手册.md / 程序接口.md
+│   ├── 实测证据与复现.md / 实施与验收记录.md
+│   ├── 审计报告.md / 纪律与闸门.md / Issues整理.md
+│   ├── 程序编译环境的搭建与实施-静态编译.md
 │   ├── dashboard.png
 │   └── scan.png
+├── 使用手册.md
+├── 项目管理与排期.md
+├── 工程纪律.md
+├── AGENTS.md          自动化代理操作规则
 ├── packaging/
 │   ├── chronosync.service
 │   └── windows/       Windows 启动/停止脚本模板
