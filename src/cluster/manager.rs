@@ -49,6 +49,7 @@ impl Role {
 struct Peer {
     node_id: String,
     addr: SocketAddr,
+    discovery_addr: SocketAddr,
     term: u64,
     last_seen: Instant,
 }
@@ -208,6 +209,7 @@ impl Cluster {
         let peer = Peer {
             node_id: message.node_id.clone(),
             addr: SocketAddr::new(from.ip(), message.time_port),
+            discovery_addr: from,
             term: message.term,
             last_seen: now,
         };
@@ -501,6 +503,10 @@ impl Cluster {
             self.cfg.discovery_port,
         ))];
         destinations.extend(self.seeds.iter().copied());
+        {
+            let state = lock(&self.inner);
+            destinations.extend(state.peers.values().map(|peer| peer.discovery_addr));
+        }
         destinations.sort();
         destinations.dedup();
         let mut sent = false;

@@ -44,6 +44,7 @@
 - [发布报告](../reports/RELEASE-1.0.2.md)
 - [构建与包校验](../reports/BUILD-1.0.2.md)
 - [真机只读测试](../reports/REAL-DEVICE-TESTS-1.0.2.md)
+- [1.1.0 集群测试](../reports/CLUSTER-TESTS-1.1.0.md)
 - [闸门日志](../reports/gates-1.0.2.log)
 
 ## 3. 阅读路径
